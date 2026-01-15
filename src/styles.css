@@ -134,7 +134,7 @@ hr {
 }
 
 .reviewShell {
-  max-width: 720px;
+  max-width: 980px;
   margin: 24px auto;
 }
 
@@ -150,6 +150,37 @@ hr {
   background: var(--panel);
   border-radius: 0 0 12px 12px;
   padding: 18px;
+}
+
+.reviewTwoCol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.reviewTwoColRight .answerBox {
+  margin-top: 0;
+}
+
+@media (min-width: 900px) {
+  .reviewTwoCol {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+}
+
+.verbLadderVerb {
+  font-size: 26px;
+  font-weight: 900;
+}
+
+.verbLadderTarget {
+  margin-top: 4px;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--muted);
 }
 
 .prompt {

@@ -26,6 +26,9 @@ export type Card = {
   answer: string;
   note?: string;
   kanji?: string;
+  verbBaseKana?: string;
+  verbBaseKanji?: string;
+  verbForm?: string;
   background?: string;
   exampleSentences?: ExampleSentence[];
 };
@@ -45,6 +48,12 @@ export type CardStats = {
   correct: number;
 };
 
+export type VocabCategory = 'noun' | 'verb' | 'adjective' | 'adverb' | 'connector' | 'other';
+
+export type VocabPracticeFilter = {
+  categories: Record<VocabCategory, boolean>;
+};
+
 export type AppState = {
   version: 1;
   decks: Record<DeckId, Deck>;
@@ -52,4 +61,6 @@ export type AppState = {
   srs: Record<CardId, CardSrs>;
   stats?: Record<CardId, CardStats>;
   wkApiToken?: string;
+  vocabPracticeFilters?: Record<DeckId, VocabPracticeFilter>;
+  repeatReviewLastAt?: Record<DeckId, number>;
 };

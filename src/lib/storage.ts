@@ -1,12 +1,56 @@
+import { toRomaji } from 'wanakana';
 import type { AppState, Card, ExampleSentence } from './models';
-import { makeSeedState } from './seed';
+import { makeSeedState, verbConjugationHintText } from './seed';
 
 const DB_NAME = 'japanese_srs_db';
 const STORE = 'kv';
 const KEY = 'app_state_v1';
 
+const safeRandomUUID = (): string => {
+  try {
+    const c = crypto as Crypto & { randomUUID?: () => string };
+    if (typeof c.randomUUID === 'function') return c.randomUUID();
+
+    if (typeof c.getRandomValues === 'function') {
+      const bytes = new Uint8Array(16);
+      c.getRandomValues(bytes);
+      bytes[6] = (bytes[6] & 0x0f) | 0x40;
+      bytes[8] = (bytes[8] & 0x3f) | 0x80;
+      const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0'));
+      return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex
+        .slice(8, 10)
+        .join('')}-${hex.slice(10, 16).join('')}`;
+    }
+  } catch {
+    // ignore
+  }
+
+  const bytes = new Uint8Array(16);
+  for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0'));
+  return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex
+    .slice(8, 10)
+    .join('')}-${hex.slice(10, 16).join('')}`;
+};
+
+const IDB_TIMEOUT_MS = 4000;
+
 const openDb = (): Promise<IDBDatabase> =>
   new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn();
+    };
+
+    const timer = setTimeout(() => {
+      finish(() => reject(new Error(`IndexedDB open timed out after ${IDB_TIMEOUT_MS}ms`)));
+    }, IDB_TIMEOUT_MS);
+
     const req = indexedDB.open(DB_NAME, 1);
 
     req.onupgradeneeded = () => {
@@ -16,8 +60,9 @@ const openDb = (): Promise<IDBDatabase> =>
       }
     };
 
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onblocked = () => finish(() => reject(new Error('IndexedDB open was blocked. Close other tabs and retry.')));
+    req.onsuccess = () => finish(() => resolve(req.result));
+    req.onerror = () => finish(() => reject(req.error));
   });
 
 const idbGet = async <T>(key: string): Promise<T | undefined> => {
@@ -26,11 +71,29 @@ const idbGet = async <T>(key: string): Promise<T | undefined> => {
     const tx = db.transaction(STORE, 'readonly');
     const store = tx.objectStore(STORE);
     const req = store.get(key);
-    req.onsuccess = () => resolve(req.result as T | undefined);
-    req.onerror = () => reject(req.error);
-    tx.oncomplete = () => db.close();
-    tx.onabort = () => db.close();
-    tx.onerror = () => db.close();
+
+    let settled = false;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      db.close();
+      fn();
+    };
+
+    const timer = setTimeout(() => {
+      try {
+        tx.abort();
+      } catch {
+        // ignore
+      }
+      finish(() => reject(new Error(`IndexedDB get timed out after ${IDB_TIMEOUT_MS}ms`)));
+    }, IDB_TIMEOUT_MS);
+
+    req.onsuccess = () => finish(() => resolve(req.result as T | undefined));
+    req.onerror = () => finish(() => reject(req.error));
+    tx.onabort = () => finish(() => reject(tx.error));
+    tx.onerror = () => finish(() => reject(tx.error));
   });
 };
 
@@ -40,19 +103,29 @@ const idbSet = async <T>(key: string, value: T): Promise<void> => {
     const tx = db.transaction(STORE, 'readwrite');
     const store = tx.objectStore(STORE);
     const req = store.put(value, key);
-    req.onerror = () => reject(req.error);
-    tx.oncomplete = () => {
+
+    let settled = false;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       db.close();
-      resolve();
+      fn();
     };
-    tx.onabort = () => {
-      db.close();
-      reject(tx.error);
-    };
-    tx.onerror = () => {
-      db.close();
-      reject(tx.error);
-    };
+
+    const timer = setTimeout(() => {
+      try {
+        tx.abort();
+      } catch {
+        // ignore
+      }
+      finish(() => reject(new Error(`IndexedDB write timed out after ${IDB_TIMEOUT_MS}ms`)));
+    }, IDB_TIMEOUT_MS);
+
+    req.onerror = () => finish(() => reject(req.error));
+    tx.oncomplete = () => finish(() => resolve());
+    tx.onabort = () => finish(() => reject(tx.error));
+    tx.onerror = () => finish(() => reject(tx.error));
   });
 };
 
@@ -124,15 +197,35 @@ const dedupeExamples = (arr: ExampleSentence[]): ExampleSentence[] => {
   return out;
 };
 
+const looksLikeVerbBaseKana = (s: string): boolean => {
+  const kana = (s ?? '').trim();
+  if (!kana) return false;
+  return (
+    kana.endsWith('る') ||
+    kana.endsWith('う') ||
+    kana.endsWith('く') ||
+    kana.endsWith('ぐ') ||
+    kana.endsWith('す') ||
+    kana.endsWith('つ') ||
+    kana.endsWith('ぬ') ||
+    kana.endsWith('ぶ') ||
+    kana.endsWith('む')
+  );
+};
+
 const migrateState = (state: AppState): { next: AppState; changed: boolean } => {
   let changed = false;
   let posRepairs = 0;
   let exampleRepairs = 0;
+  let verbHintRepairs = 0;
 
   let decks = state.decks;
   let cards = state.cards;
+  let srs = state.srs;
   let stats = state.stats;
   const wkApiToken = state.wkApiToken;
+  const vocabPracticeFilters = state.vocabPracticeFilters;
+  const repeatReviewLastAt = state.repeatReviewLastAt;
 
   for (const [cardId, card] of Object.entries(cards)) {
     const raw = (card as unknown as { exampleSentences?: unknown }).exampleSentences;
@@ -142,12 +235,44 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
     let nextCard: Card = card;
     let cardChanged = false;
 
+    const deck = decks[nextCard.deckId];
+    const isVerbConjugationDeck = (deck?.name ?? '').toLowerCase().includes('verb conjugation');
+    const form = (nextCard.verbForm ?? '').trim().toLowerCase();
+    const knownVerbForm =
+      form === 'dictionary' ||
+      form === 'polite_present' ||
+      form === 'te' ||
+      form === 'past' ||
+      form === 'negative' ||
+      form === 'past_negative' ||
+      form === 'want' ||
+      form === 'dont_want' ||
+      form === 'want_past' ||
+      form === 'dont_want_past';
+
     const isLegacyStrings = Array.isArray(raw) && raw.some((e) => typeof e === 'string');
     const needsExampleUpdate = isLegacyStrings || normalized.length !== deduped.length;
     if (needsExampleUpdate) {
       nextCard = { ...nextCard, exampleSentences: deduped.length ? deduped : undefined };
       cardChanged = true;
       exampleRepairs++;
+    }
+
+    if (isVerbConjugationDeck && nextCard.type === 'verb' && knownVerbForm) {
+      const note = (nextCard.note ?? '').trim();
+      const hasNewHint = note.includes('Forms:') && note.includes('Reminders:');
+      const legacyRomaji = toRomaji(nextCard.answer).trim();
+      const isLegacyRomajiOnly = !!note && note === legacyRomaji;
+      const isMissing = !note;
+
+      if (!hasNewHint && (isMissing || isLegacyRomajiOnly)) {
+        nextCard = {
+          ...nextCard,
+          note: verbConjugationHintText(form as any, nextCard.answer),
+        };
+        cardChanged = true;
+        verbHintRepairs++;
+      }
     }
 
     if (nextCard.type === 'vocab' && nextCard.kanji && looksLikeSentence(nextCard.kanji)) {
@@ -190,7 +315,7 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
   if (!hasJaEnDeck) {
     const vocabDeck = Object.values(decks).find((d) => d.name.toLowerCase().includes('common vocab'));
     if (vocabDeck) {
-      const newDeckId = `deck_${crypto.randomUUID()}`;
+      const newDeckId = `deck_${safeRandomUUID()}`;
       const newDeck = {
         id: newDeckId,
         name: 'Common Vocab (Non-WK) — JP→EN',
@@ -203,7 +328,7 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
       for (const srcId of vocabDeck.cardIds) {
         const src = cards[srcId];
         if (!src || src.type !== 'vocab') continue;
-        const newCardId = `card_${crypto.randomUUID()}`;
+        const newCardId = `card_${safeRandomUUID()}`;
         newCards[newCardId] = {
           ...src,
           id: newCardId,
@@ -252,7 +377,7 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
       const key = cardSeedKey(seedCard);
       if (existingKeys.has(key)) continue;
 
-      const newCardId = `card_${crypto.randomUUID()}`;
+      const newCardId = `card_${safeRandomUUID()}`;
       cards = {
         ...cards,
         [newCardId]: {
@@ -300,13 +425,31 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
       nextCard = { ...nextCard, note: seedCard.note };
       cardChanged = true;
     }
+    if (!nextCard.verbBaseKana && seedCard.verbBaseKana) {
+      nextCard = { ...nextCard, verbBaseKana: seedCard.verbBaseKana };
+      cardChanged = true;
+    }
+    if (!nextCard.verbBaseKanji && seedCard.verbBaseKanji) {
+      nextCard = { ...nextCard, verbBaseKanji: seedCard.verbBaseKanji };
+      cardChanged = true;
+    }
+    if (!nextCard.verbForm && seedCard.verbForm) {
+      nextCard = { ...nextCard, verbForm: seedCard.verbForm };
+      cardChanged = true;
+    }
     if (!nextCard.background && seedCard.background) {
       nextCard = { ...nextCard, background: seedCard.background };
       cardChanged = true;
     }
-    if ((!nextCard.exampleSentences || nextCard.exampleSentences.length === 0) && seedCard.exampleSentences?.length) {
-      nextCard = { ...nextCard, exampleSentences: seedCard.exampleSentences };
-      cardChanged = true;
+    if (seedCard.exampleSentences?.length) {
+      const existingEx = dedupeExamples(normalizeExamples((nextCard as unknown as { exampleSentences?: unknown }).exampleSentences));
+      const seedEx = dedupeExamples(normalizeExamples((seedCard as unknown as { exampleSentences?: unknown }).exampleSentences));
+      const merged = dedupeExamples([...existingEx, ...seedEx]);
+
+      if (merged.length !== existingEx.length) {
+        nextCard = { ...nextCard, exampleSentences: merged.length ? merged : undefined };
+        cardChanged = true;
+      }
     }
 
     if (cardChanged) {
@@ -323,6 +466,61 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
     changed = true;
   }
 
+  const removedBadVerbCards: string[] = [];
+  for (const [deckId, deck] of Object.entries(decks)) {
+    const name = deck.name.toLowerCase();
+    if (!name.includes('verb conjugation')) continue;
+
+    const keep: string[] = [];
+    for (const cardId of deck.cardIds) {
+      const c = cards[cardId];
+      if (!c) continue;
+
+      const pos = (c.pos ?? '').toLowerCase();
+      const baseKana = (c.verbBaseKana || c.answer || '').trim();
+
+      const isAdverb = pos.includes('adverb');
+      const looksLikeVerb = looksLikeVerbBaseKana(baseKana);
+
+      if (c.type === 'verb' && isAdverb) {
+        removedBadVerbCards.push(cardId);
+        continue;
+      }
+
+      keep.push(cardId);
+    }
+
+    if (keep.length !== deck.cardIds.length) {
+      decks = {
+        ...decks,
+        [deckId]: {
+          ...deck,
+          cardIds: keep,
+        },
+      };
+      changed = true;
+    }
+  }
+
+  if (removedBadVerbCards.length) {
+    const nextCards = { ...cards };
+    const nextSrs = { ...srs };
+    const nextStats = { ...(stats ?? {}) };
+
+    for (const id of removedBadVerbCards) {
+      delete nextCards[id];
+      delete nextSrs[id];
+      delete nextStats[id];
+    }
+
+    cards = nextCards;
+    srs = nextSrs;
+    stats = nextStats;
+    console.info(
+      `Removed ${removedBadVerbCards.length} invalid card(s) from Verb Conjugation deck (adverb misclassification cleanup).`,
+    );
+  }
+
   if (posRepairs > 0) {
     console.info(`Repaired ${posRepairs} card(s) with invalid part-of-speech metadata.`);
   }
@@ -331,14 +529,21 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
     console.info(`Normalized example sentences on ${exampleRepairs} card(s) (dedupe/format upgrade).`);
   }
 
+  if (verbHintRepairs > 0) {
+    console.info(`Upgraded hint text on ${verbHintRepairs} Verb Conjugation card(s) (forms + reminders).`);
+  }
+
   if (!changed) return { next: state, changed: false };
   return {
     next: {
       ...state,
       decks,
       cards,
+      srs,
       stats,
       wkApiToken,
+      vocabPracticeFilters,
+      repeatReviewLastAt,
     },
     changed: true,
   };
