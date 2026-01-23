@@ -22,6 +22,35 @@ const looksLikeVerbBaseKana = (s: string): boolean => {
     kana.endsWith('つ') || kana.endsWith('ぬ') || kana.endsWith('ぶ') || kana.endsWith('む');
 };
 
+const isKnownVerbForm = (form: string | undefined): boolean => {
+  switch ((form ?? '').trim().toLowerCase()) {
+    case 'dictionary':
+    case 'polite_present':
+    case 'te':
+    case 'past':
+    case 'negative':
+    case 'past_negative':
+    case 'want':
+    case 'dont_want':
+    case 'want_past':
+    case 'dont_want_past':
+      return true;
+    default:
+      return false;
+  }
+};
+
+const isGeneratedVerbCard = (c: { type?: string; pos?: string; prompt?: string; verbBaseKana?: string; verbForm?: string } | undefined): boolean => {
+  if (!c || c.type !== 'verb') return false;
+  const baseKana = (c.verbBaseKana ?? '').trim();
+  if (!baseKana) return false;
+  if (!looksLikeVerbBaseKana(baseKana)) return false;
+  if (!isKnownVerbForm(c.verbForm)) return false;
+  const pos = (c.pos ?? '').toLowerCase();
+  const cue = (c.prompt ?? '').trim().toLowerCase();
+  return pos.includes('verb') || cue.startsWith('to ');
+};
+
 export const isVocabOnlyDeck = (state: AppState, deckId: DeckId): boolean => {
   const deck = state.decks[deckId];
   if (!deck || deck.cardIds.length === 0) return false;
@@ -130,7 +159,7 @@ export const getVerbLadderQueueForReview = (state: AppState, deckId: DeckId, now
   const dueIds: CardId[] = [];
   for (const cardId of deck.cardIds) {
     const c = state.cards[cardId];
-    if (c && !looksLikeVerbBaseKana(c.verbBaseKana || c.answer || '')) continue;
+    if (c && !isGeneratedVerbCard(c)) continue;
     const srs = state.srs[cardId] ?? defaultSrs(cardId, now);
     if (srs.due <= now) dueIds.push(cardId);
   }
@@ -167,7 +196,7 @@ export const getVerbLadderQueueForPractice = (state: AppState, deckId: DeckId, n
   const byBase = new Map<string, CardId[]>();
   for (const id of deck.cardIds) {
     const c = state.cards[id];
-    if (c && !looksLikeVerbBaseKana(c.verbBaseKana || c.answer || '')) continue;
+    if (c && !isGeneratedVerbCard(c)) continue;
     const base = verbBaseKey(state, id);
     const bucket = byBase.get(base) ?? [];
     bucket.push(id);
@@ -213,7 +242,7 @@ export const getVerbLadderQueueForBases = (state: AppState, deckId: DeckId, orde
   const byBase = new Map<string, CardId[]>();
   for (const id of deck.cardIds) {
     const c = state.cards[id];
-    if (c && !looksLikeVerbBaseKana(c.verbBaseKana || c.answer || '')) continue;
+    if (c && !isGeneratedVerbCard(c)) continue;
     const base = verbBaseKey(state, id);
     if (!baseOrder.has(base)) continue;
     const bucket = byBase.get(base) ?? [];

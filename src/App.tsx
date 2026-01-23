@@ -712,11 +712,17 @@ function VerbConjugationBrowserScreen(props: {
       if (!c || c.type !== 'verb') continue;
 
       const form = (c.verbForm ?? '').toLowerCase().trim();
-      if (form && form !== 'dictionary') continue;
+      if (form !== 'dictionary') continue;
 
-      const baseKana = (c.verbBaseKana || c.answer || '').trim();
+      const baseKana = (c.verbBaseKana ?? '').trim();
       const baseKanji = (c.verbBaseKanji || '').trim() || undefined;
       if (!baseKana) continue;
+
+      const pos = (c.pos ?? '').toLowerCase();
+      const cue = (c.prompt ?? '').trim().toLowerCase();
+      const hasVerbPos = pos.includes('verb');
+      const hasVerbCue = cue.startsWith('to ');
+      if (!hasVerbPos && !hasVerbCue) continue;
 
       const raw = `${(baseKanji ?? '').trim()}||${baseKana}`.trim();
       const key = raw && raw !== '||' ? raw : id;
@@ -1076,6 +1082,49 @@ function ReviewScreen(props: {
     return form ? form : '—';
   };
 
+  const verbTargetEnglishGloss = (formRaw: string | undefined, englishPrompt: string): string => {
+    const form = (formRaw ?? '').trim().toLowerCase();
+    const firstMeaning = (englishPrompt ?? '').split(';')[0]?.trim() ?? '';
+    const base = firstMeaning.replace(/^to\s+/i, '').trim();
+    if (!base) return '';
+
+    const pastIrregular: Record<string, string> = {
+      go: 'went',
+      eat: 'ate',
+      drink: 'drank',
+      buy: 'bought',
+      read: 'read',
+      write: 'wrote',
+      speak: 'spoke',
+      sleep: 'slept',
+      leave: 'left',
+      have: 'had',
+      be: 'was',
+      do: 'did',
+      'wake up': 'woke up',
+    };
+
+    const pastOf = (v: string): string => {
+      const key = v.toLowerCase();
+      if (pastIrregular[key]) return pastIrregular[key];
+      if (key.endsWith('e')) return `${v}d`;
+      if (key.endsWith('y') && !/[aeiou]y$/i.test(v)) return `${v.slice(0, -1)}ied`;
+      return `${v}ed`;
+    };
+
+    if (form === 'dictionary') return base;
+    if (form === 'polite_present') return `${base} (polite)`;
+    if (form === 'te') return `${base} (and then…)`;
+    if (form === 'past') return pastOf(base);
+    if (form === 'negative') return `don't ${base}`;
+    if (form === 'past_negative') return `didn't ${base}`;
+    if (form === 'want') return `want to ${base}`;
+    if (form === 'dont_want') return `don't want to ${base}`;
+    if (form === 'want_past') return `wanted to ${base}`;
+    if (form === 'dont_want_past') return `didn't want to ${base}`;
+    return base;
+  };
+
   const hintText =
     direction === 'ja-en' && card?.type === 'vocab'
       ? card.answer
@@ -1091,11 +1140,23 @@ function ReviewScreen(props: {
       : dedupeExamples([...baseExamples, { ja: legacyKanjiExample }])
     : baseExamples;
 
+  const verbGroupKeyForCardId = (cid: CardId): string => {
+    const c = state.cards[cid];
+    if (!c || c.type !== 'verb') return '';
+    const bk = (c.verbBaseKanji || '').trim();
+    const ba = (c.verbBaseKana || '').trim();
+    if (bk || ba) return `${bk}||${ba}`;
+    const p = (c.prompt || '').trim().toLowerCase();
+    if (p) return `prompt||${p}`;
+    return `answer||${(c.answer || '').trim()}`;
+  };
+
   const [value, setValue] = useState('');
   const [checked, setChecked] = useState<null | { correct: boolean; expected: string; got: string }>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [wkByCardId, setWkByCardId] = useState<Record<string, WkLookupState>>({});
+  const [skippedVerbGroupKeys, setSkippedVerbGroupKeys] = useState<Record<string, true>>({});
 
   useEffect(() => {
     setValue('');
@@ -1120,6 +1181,9 @@ function ReviewScreen(props: {
   const verbBaseKanji = (card?.verbBaseKanji || '').trim();
   const verbBaseKey = `${verbBaseKanji}||${verbBaseKana}`;
   const showVerbLadder = isVerbConjugationDeck && card?.type === 'verb' && verbBaseKey !== '||' && !!card?.verbForm;
+  const verbTargetGloss = showVerbLadder ? verbTargetEnglishGloss(card.verbForm, card.prompt) : '';
+  const verbGroupKey = isVerbConjugationDeck && card?.type === 'verb' ? verbGroupKeyForCardId(cardId) : '';
+  const isVerbGroupSkipped = !!verbGroupKey && !!skippedVerbGroupKeys[verbGroupKey];
 
   const verbRuleText = (() => {
     if (!showVerbLadder) return '';
@@ -1273,17 +1337,10 @@ function ReviewScreen(props: {
   let ladderStep = 1;
   let ladderTotal = 1;
   if (showVerbLadder) {
-    const keyFor = (cid: CardId): string => {
-      const c = state.cards[cid];
-      const bk = (c?.verbBaseKanji || '').trim();
-      const ba = (c?.verbBaseKana || c?.answer || '').trim();
-      return `${bk}||${ba}`;
-    };
-
     let start = idx;
-    while (start > 0 && keyFor(queue[start - 1]) === verbBaseKey) start--;
+    while (start > 0 && verbGroupKeyForCardId(queue[start - 1]) === verbGroupKey) start--;
     let end = idx;
-    while (end + 1 < queue.length && keyFor(queue[end + 1]) === verbBaseKey) end++;
+    while (end + 1 < queue.length && verbGroupKeyForCardId(queue[end + 1]) === verbGroupKey) end++;
     ladderStep = idx - start + 1;
     ladderTotal = end - start + 1;
   }
@@ -1395,6 +1452,45 @@ function ReviewScreen(props: {
     setIdx(idx + 1);
   };
 
+  const skipToNextUnskipped = (startAt: number): number | null => {
+    for (let j = startAt; j < queue.length; j += 1) {
+      const k = verbGroupKeyForCardId(queue[j]);
+      if (k && skippedVerbGroupKeys[k]) continue;
+      return j;
+    }
+    return null;
+  };
+
+  const onSkipVerb = () => {
+    if (!verbGroupKey) return;
+    setSkippedVerbGroupKeys((prev) => (prev[verbGroupKey] ? prev : { ...prev, [verbGroupKey]: true }));
+
+    let nextIdx: number | null = null;
+    for (let j = idx + 1; j < queue.length; j += 1) {
+      const k = verbGroupKeyForCardId(queue[j]);
+      if (k === verbGroupKey) continue;
+      if (k && skippedVerbGroupKeys[k]) continue;
+      nextIdx = j;
+      break;
+    }
+
+    if (nextIdx === null) {
+      const fallback = skipToNextUnskipped(idx + 1);
+      if (fallback === null) onExit();
+      else setIdx(fallback);
+      return;
+    }
+
+    setIdx(nextIdx);
+  };
+
+  useEffect(() => {
+    if (!isVerbGroupSkipped) return;
+    const nextIdx = skipToNextUnskipped(idx + 1);
+    if (nextIdx === null) onExit();
+    else setIdx(nextIdx);
+  }, [idx, isVerbGroupSkipped, onExit, setIdx, skippedVerbGroupKeys, verbGroupKey]);
+
   useEffect(() => {
     const onKeyDown = (e: globalThis.KeyboardEvent) => {
       if (e.key !== 'Enter') return;
@@ -1424,6 +1520,11 @@ function ReviewScreen(props: {
             {verbBaseKanji && verbBaseKana ? <span className="small"> ({verbBaseKana})</span> : null}
           </div>
           <div className="verbLadderTarget">Target: {verbFormLabel(card.verbForm)}</div>
+          {verbTargetGloss ? (
+            <div className="small">
+              Meaning: <b>{verbTargetGloss}</b>
+            </div>
+          ) : null}
           <div className="small">
             Step: <b>{ladderStep}/{ladderTotal}</b>
           </div>
@@ -1642,6 +1743,11 @@ function ReviewScreen(props: {
             <button className="primary" onClick={onNext}>
               {idx + 1 >= queue.length ? 'Finish' : 'Next'}
             </button>
+            {isVerbConjugationDeck && card.type === 'verb' ? (
+              <button onClick={onSkipVerb} disabled={!verbGroupKey}>
+                Skip this verb
+              </button>
+            ) : null}
           </div>
         </div>
       ) : (
@@ -1649,6 +1755,11 @@ function ReviewScreen(props: {
           <button className="primary" onClick={onSubmit}>
             Check
           </button>
+          {isVerbConjugationDeck && card.type === 'verb' ? (
+            <button onClick={onSkipVerb} disabled={!verbGroupKey}>
+              Skip this verb
+            </button>
+          ) : null}
         </div>
       )}
     </>
@@ -1674,7 +1785,7 @@ function ReviewScreen(props: {
       <div className="reviewShell">
         <div className="reviewBanner" />
         <div className="reviewBody">
-          {card.type === 'sentence' && direction === 'en-ja' ? (
+          {card.type === 'sentence' && direction === 'en-ja' && (deck?.name ?? '').toLowerCase().includes('sentence writing') ? (
             <div className="small" style={{ marginBottom: 10 }}>
               Expected formality: <b>casual / plain</b>. Use kana. Avoid <b>です/ます</b> unless the English prompt implies polite
               speech.
@@ -1775,6 +1886,13 @@ function ManageScreen(props: {
     return ms.find((m) => m.primary)?.meaning ?? ms[0]?.meaning ?? '';
   };
 
+  const wkVerbCueMeaning = (s: WkSubject): string => {
+    const ms = s.data.meanings ?? [];
+    const list = ms.map((m) => (m.meaning ?? '').trim()).filter(Boolean);
+    const toMeaning = list.find((m) => m.toLowerCase().startsWith('to '));
+    return toMeaning ?? wkPrimaryMeaning(s);
+  };
+
   const wkMeaningSummary = (s: WkSubject): string => {
     const ms = s.data.meanings ?? [];
     const list = ms.map((m) => m.meaning).filter(Boolean);
@@ -1856,7 +1974,7 @@ function ManageScreen(props: {
         const kana = wkPrimaryReading(s).trim();
         if (!kana) continue;
         const kanji = (s.data.characters ?? '').trim() || undefined;
-        const english = wkPrimaryMeaning(s).trim();
+        const english = wkVerbCueMeaning(s).trim();
         if (!english) continue;
 
         const pos = (s.data.parts_of_speech ?? []).join(', ') || 'verb';

@@ -306,12 +306,14 @@ export const makeSeedState = (): AppState => {
   const vocabJaEn = makeDeck('Common Vocab (Non-WK) — JP→EN', 'Japanese → English (type meaning)', 'ja-en');
   const verbs = makeDeck('Verb Conjugation', 'English cue → Japanese conjugation (kana)', 'en-ja');
   const sentences = makeDeck('Sentence Writing', 'English → Japanese (kana)', 'en-ja');
+  const phrases = makeDeck('Common Phrases', 'English → Japanese (common phrases; kana)', 'en-ja');
 
   const decks: AppState['decks'] = {
     [vocab.id]: vocab,
     [vocabJaEn.id]: vocabJaEn,
     [verbs.id]: verbs,
     [sentences.id]: sentences,
+    [phrases.id]: phrases,
   };
 
   const cards: AppState['cards'] = {};
@@ -320,6 +322,493 @@ export const makeSeedState = (): AppState => {
     cards[card.id] = card;
     decks[card.deckId].cardIds.push(card.id);
   };
+
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Nice to meet you.',
+      'はじめまして',
+      'hajimemashite',
+      'Used when meeting someone for the first time.\n\nOften followed by: よろしくおねがいします (pleased to meet you / please treat me well).',
+      undefined,
+      '初めまして',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Please treat me well. (after meeting someone)',
+      'よろしくおねがいします',
+      'yoroshiku onegaishimasu',
+      'よろしく = well / kindly\nおねがいします = please (request)\n\nMeaning: A set phrase used after greetings/introductions. Not a literal “please.”',
+      undefined,
+      'よろしくお願いします',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Thank you. (casual)',
+      'ありがとう',
+      'arigatou',
+      'Casual “thank you.” More polite: ありがとうございます.',
+      undefined,
+      undefined,
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Thank you very much. (polite)',
+      'ありがとうございます',
+      'arigatou gozaimasu',
+      'ありがとうございます = thank you (polite)\n\nNotes:\n- Use with strangers, in shops, at work.\n- Past: ありがとうございました.',
+      undefined,
+      undefined,
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Excuse me / I’m sorry.',
+      'すみません',
+      'sumimasen',
+      'Common multi-purpose phrase:\n- “Excuse me” (getting attention)\n- “Sorry”\n- sometimes “thanks (for the trouble)”',
+      undefined,
+      undefined,
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Where is the bathroom?',
+      'といれはどこですか',
+      'toire wa doko desu ka',
+      'といれ = toilet / bathroom\nは = topic particle\nどこ = where\nですか = polite question\n\nStructure: [topic] は どこ ですか',
+      undefined,
+      'トイレはどこですか',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'I don’t understand.',
+      'わかりません',
+      'wakarimasen',
+      'わかりません = (polite negative) I don’t understand\n\nBase verb: わかる (to understand)\nPolite negative: 〜ません',
+      undefined,
+      '分かりません',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Do you speak English?',
+      'えいごをはなしますか',
+      'eigo o hanashimasu ka',
+      'えいご = English\nを = object particle\nはなします = speak (polite)\nか = question\n\nUseful when asking for help.',
+      undefined,
+      '英語を話しますか',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Do you speak Japanese?',
+      'にほんごをはなしますか',
+      'nihongo o hanashimasu ka',
+      'にほんご = Japanese\nを = object particle\nはなします = speak (polite)\nか = question',
+      undefined,
+      '日本語を話しますか',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'I speak a little Japanese.',
+      'すこしにほんごをはなします',
+      'sukoshi nihongo o hanashimasu',
+      'すこし = a little\nにほんご = Japanese\nを = object particle\nはなします = speak (polite)',
+      undefined,
+      '少し日本語を話します',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'I don’t understand Japanese.',
+      'にほんごがわかりません',
+      'nihongo ga wakarimasen',
+      'にほんご = Japanese\nが = subject particle\nわかりません = I don’t understand (polite)',
+      undefined,
+      '日本語が分かりません',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Please speak slowly.',
+      'ゆっくりはなしてください',
+      'yukkuri hanashite kudasai',
+      'ゆっくり = slowly\nはなして = te-form of はなす\nください = please\n\nNatural request when you can’t follow.',
+      undefined,
+      'ゆっくり話してください',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Could you say it again? / One more time, please.',
+      'もういちどおねがいします',
+      'mou ichido onegaishimasu',
+      'もう = again / more\nいちど = one time\nおねがいします = please (request)\n\nStructure: もう + いちど + おねがいします',
+      undefined,
+      'もう一度お願いします',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'That’s fine / It’s okay.',
+      'だいじょうぶです',
+      'daijoubu desu',
+      'だいじょうぶ = okay / alright\nです = polite copula\n\nOften used to reassure someone (“I’m fine / no problem”).',
+      undefined,
+      '大丈夫です',
+      'expression',
+    ),
+  );
+
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Hello. (daytime greeting)',
+      'こんにちは',
+      'konnichiwa',
+      'Common daytime greeting. Neutral/polite.',
+      undefined,
+      undefined,
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Good morning. (polite)',
+      'おはようございます',
+      'ohayou gozaimasu',
+      'おはよう = good morning\nございます = polite (adds formality)\n\nCasual: おはよう',
+      undefined,
+      undefined,
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Good evening.',
+      'こんばんは',
+      'konbanwa',
+      'Evening greeting.',
+      undefined,
+      undefined,
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Good night.',
+      'おやすみなさい',
+      'oyasuminasai',
+      'Used when going to sleep / saying good night.',
+      undefined,
+      undefined,
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'See you later. (casual)',
+      'またね',
+      'matane',
+      'また = again\nね = casual tone\n\nAlso: またあした (see you tomorrow).',
+      undefined,
+      undefined,
+      'expression',
+    ),
+  );
+
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'How much is this?',
+      'これはいくらですか',
+      'kore wa ikura desu ka',
+      'これ = this\nは = topic particle\nいくら = how much\nですか = polite question\n\nStructure: これは いくら ですか',
+      undefined,
+      'これはいくらですか',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'I’m just looking.',
+      'みているだけです',
+      'mite iru dake desu',
+      'みている = am looking\nだけ = only\nです = polite\n\nUseful in shops when you don’t need help yet.',
+      undefined,
+      '見ているだけです',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Can I try it on?',
+      'しちゃくしてもいいですか',
+      'shichaku shite mo ii desu ka',
+      'しちゃく = try on (clothes)\nしてもいいですか = may I do it?\n\nStructure: [verb te-form] も いいですか (Is it okay if I ...?)',
+      undefined,
+      '試着してもいいですか',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'I’ll take this.',
+      'これにします',
+      'kore ni shimasu',
+      'これ = this\nに = as / for\nします = do (polite)\n\nMeaning: “I choose this.”',
+      undefined,
+      'これにします',
+      'expression',
+    ),
+  );
+
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Menu, please.',
+      'めにゅうをおねがいします',
+      'menyuu o onegaishimasu',
+      'めにゅう = menu\nを = object particle\nおねがいします = please (request)\n\nCommon in restaurants.',
+      undefined,
+      'メニューをお願いします',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'This, please. / I’ll have this.',
+      'これをください',
+      'kore o kudasai',
+      'これ = this\nを = object particle\nください = please give me\n\nSimple ordering phrase.',
+      undefined,
+      'これをください',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Water, please.',
+      'みずをください',
+      'mizu o kudasai',
+      'みず = water\nを = object particle\nください = please give me\n\nPolite and common.',
+      undefined,
+      '水をください',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'English menu, please.',
+      'えいごのめにゅうはありますか',
+      'eigo no menyuu wa arimasu ka',
+      'えいご = English\nの = modifier\nめにゅう = menu\nは = topic\nありますか = do you have it?\n\nStructure: X は ありますか',
+      undefined,
+      '英語のメニューはありますか',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Check, please.',
+      'おかいけいおねがいします',
+      'okaikei onegaishimasu',
+      'おかいけい = the bill / check\nおねがいします = please\n\nOften said at the end of a meal.',
+      undefined,
+      'お会計お願いします',
+      'expression',
+    ),
+  );
+
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'I want to ski.',
+      'すきいをしたいです',
+      'sukii o shitai desu',
+      'すきい = ski (written out in kana)\nを = object particle\nしたいです = want to do (polite)\n\nVerb: する → したいです (want to do).',
+      undefined,
+      'スキーをしたいです',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Where is the lift?',
+      'りふとはどこですか',
+      'rifuto wa doko desu ka',
+      'りふと = lift\nは = topic\nどこ = where\nですか = polite question\n\nStructure: X は どこですか',
+      undefined,
+      'リフトはどこですか',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'I want to rent skis.',
+      'すきいをれんたるしたいです',
+      'sukii o rentaru shitai desu',
+      'すきい = skis\nを = object particle\nれんたる = rental\nしたいです = want to do (polite)\n\nStructure: X を レンタルしたいです',
+      undefined,
+      'スキーをレンタルしたいです',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'A one-day lift ticket, please.',
+      'りふとのいちにちけんをおねがいします',
+      'rifuto no ichinichi ken o onegaishimasu',
+      'りふと = lift\nの = for / of\nいちにちけん = one-day ticket\nを = object\nおねがいします = please\n\nGood for buying lift tickets.',
+      undefined,
+      'リフトの一日券をお願いします',
+      'expression',
+    ),
+  );
+
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Beer, please.',
+      'びーるをください',
+      'biiru o kudasai',
+      'びーる = beer\nを = object particle\nください = please give me\n\nCommon ordering phrase.',
+      undefined,
+      'ビールをください',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Two of these, please.',
+      'これをふたつください',
+      'kore o futatsu kudasai',
+      'これ = this\nを = object particle\nふたつ = two (things)\nください = please give me\n\nUseful in shops or restaurants.',
+      undefined,
+      'これを二つください',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'What do you recommend?',
+      'おすすめはなんですか',
+      'osusume wa nan desu ka',
+      'おすすめ = recommendation\nは = topic particle\nなん = what\nですか = polite question\n\nUseful when ordering food/drinks.',
+      undefined,
+      'おすすめは何ですか',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Please help.',
+      'たすけてください',
+      'tasukete kudasai',
+      'たすけて = te-form of たすける (help)\nください = please\n\nDirect and useful in emergencies.',
+      undefined,
+      '助けてください',
+      'expression',
+    ),
+  );
+  add(
+    makeCard(
+      phrases.id,
+      'sentence',
+      'Please call ski patrol.',
+      'すきーぱとろーるをよんでください',
+      'sukii patorooru o yonde kudasai',
+      'すきーぱとろーる = ski patrol\nを = object particle\nよんで = te-form of よぶ (call)\nください = please\n\nUseful if someone is injured.',
+      undefined,
+      'スキーパトロールを呼んでください',
+      'expression',
+    ),
+  );
 
   add(
     makeCard(
@@ -354,6 +843,24 @@ export const makeSeedState = (): AppState => {
   add(makeCard(vocab.id, 'vocab', 'to drink', 'のむ', 'nomu', undefined, [{ ja: 'みずをのむ。' }, { ja: 'おちゃをのむ。' }], '飲む', 'verb (transitive)'));
   add(makeCard(vocab.id, 'vocab', 'to buy', 'かう', 'kau', undefined, [{ ja: 'パンをかう。' }, { ja: 'みせでパンをかう。' }, { ja: 'これをかう。' }], '買う', 'verb (transitive)'));
   add(makeCard(vocab.id, 'vocab', 'to use', 'つかう', 'tsukau', undefined, [{ ja: 'ペンをつかう。' }, { ja: 'これをつかう。' }], '使う', 'verb (transitive)'));
+  add(makeCard(vocab.id, 'vocab', 'to look; to watch', 'みる', 'miru', undefined, [{ ja: 'みる。' }, { ja: 'みているだけです。' }], '見る', 'verb (transitive)'));
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to do',
+      'する',
+      'suru',
+      'Irregular verb. Also used in many compound verbs (〜する), e.g. べんきょうをする / りょうりをする.',
+      [{ ja: 'べんきょうをする。' }, { ja: 'しごとをする。' }, { ja: 'りょうりをする。' }],
+      undefined,
+      'verb (irregular)',
+    ),
+  );
+  add(makeCard(vocab.id, 'vocab', 'to try on (clothes)', 'しちゃくする', 'shichaku suru', undefined, [{ ja: 'しちゃくしてもいいですか。' }], '試着する', 'verb (irregular)'));
+  add(makeCard(vocab.id, 'vocab', 'to rent (a thing)', 'れんたるする', 'rentaru suru', undefined, [{ ja: 'すきいをれんたるしたいです。' }], 'レンタルする', 'verb (irregular)'));
+  add(makeCard(vocab.id, 'vocab', 'to help', 'たすける', 'tasukeru', undefined, [{ ja: 'たすけてください。' }], '助ける', 'verb (transitive)'));
+  add(makeCard(vocab.id, 'vocab', 'to call (someone); to summon', 'よぶ', 'yobu', undefined, [{ ja: 'すきーぱとろーるをよぶ。' }], '呼ぶ', 'verb (transitive)'));
   add(makeCard(vocab.id, 'vocab', 'to live (reside)', 'すむ', 'sumu', undefined, [{ ja: 'とうきょうにすむ。' }, { ja: 'にほんにすむ。' }, { ja: 'ここにすむ。' }], '住む', 'verb (intransitive)'));
   add(makeCard(vocab.id, 'vocab', 'to work', 'はたらく', 'hataraku', undefined, [{ ja: 'まいにちはたらく。' }, { ja: 'みせではたらく。' }], '働く', 'verb (intransitive)'));
   add(makeCard(vocab.id, 'vocab', 'to sleep', 'ねる', 'neru', undefined, [{ ja: 'よるにねる。' }, { ja: 'つかれたからねる。' }, { ja: 'いまねる。' }], '寝る', 'verb (intransitive)'));
@@ -364,17 +871,20 @@ export const makeSeedState = (): AppState => {
   add(makeCard(vocab.id, 'vocab', 'to speak/talk', 'はなす', 'hanasu', undefined, [{ ja: 'にほんごをはなす。' }, { ja: 'ともだちとはなす。' }], '話す', 'verb (transitive)'));
   add(makeCard(vocab.id, 'vocab', 'to read', 'よむ', 'yomu', undefined, [{ ja: 'ほんをよむ。' }, { ja: 'しんぶんをよむ。' }], '読む', 'verb (transitive)'));
   add(makeCard(vocab.id, 'vocab', 'to write', 'かく', 'kaku', undefined, [{ ja: 'なまえをかく。' }, { ja: 'てがみをかく。' }, { ja: 'ここにかく。' }], '書く', 'verb (transitive)'));
-  add(makeCard(vocab.id, 'vocab', 'can do; be able to', 'できる', 'dekiru', undefined, [{ ja: 'にほんごができる。' }], '出来る', 'verb (intransitive)'));
+  add(makeCard(vocab.id, 'vocab', 'to be able to; can do', 'できる', 'dekiru', undefined, [{ ja: 'にほんごができる。' }], '出来る', 'verb (intransitive)'));
   add(makeCard(vocab.id, 'vocab', 'want (a thing)', 'ほしい', 'hoshii', undefined, [{ ja: 'あたらしいくつがほしい。' }], '欲しい', 'i-adjective'));
   add(makeCard(vocab.id, 'vocab', 'want to (do)', '〜たい', '~tai', undefined, [{ ja: 'たべたい。' }], undefined, 'auxiliary / suffix'));
   add(makeCard(vocab.id, 'vocab', 'please (request)', 'おねがいします', 'onegaishimasu', undefined, [{ ja: 'みずをおねがいします。' }], 'お願いします', 'expression'));
+  add(makeCard(vocab.id, 'vocab', 'please give me (polite request)', 'ください', 'kudasai', 'Polite request form. Often used as: [thing] を ください.', [{ ja: 'みずをください。' }, { ja: 'これをください。' }, { ja: 'びーるをください。' }], undefined, 'expression'));
   add(makeCard(vocab.id, 'vocab', 'okay; alright; no problem', 'だいじょうぶ', 'daijoubu', undefined, [{ ja: 'だいじょうぶです。' }], '大丈夫', 'na-adjective'));
   add(makeCard(vocab.id, 'vocab', 'and; and then', 'そして', 'soshite', undefined, [{ ja: 'パンをかって、そしてたべる。' }, { ja: 'みせにいって、そしてかえる。' }], undefined, 'conjunction'));
   add(makeCard(vocab.id, 'vocab', 'after that; then', 'それから', 'sorekara', undefined, [{ ja: 'それから、いえにかえる。' }], undefined, 'conjunction'));
   add(makeCard(vocab.id, 'vocab', 'but; however', 'でも', 'demo', undefined, [{ ja: 'いきたい。でも、じかんがない。' }], undefined, 'conjunction'));
   add(makeCard(vocab.id, 'vocab', 'so; therefore', 'だから', 'dakara', undefined, [{ ja: 'あめだ。だから、いえにいる。' }], undefined, 'conjunction'));
   add(makeCard(vocab.id, 'vocab', 'who', 'だれ', 'dare', undefined, [{ ja: 'だれですか。' }], undefined, 'pronoun'));
+  add(makeCard(vocab.id, 'vocab', 'this', 'これ', 'kore', undefined, [{ ja: 'これはいくらですか。' }, { ja: 'これをください。' }, { ja: 'これにします。' }], undefined, 'pronoun'));
   add(makeCard(vocab.id, 'vocab', 'where', 'どこ', 'doko', undefined, [{ ja: 'どこにいきますか。' }], undefined, 'pronoun'));
+  add(makeCard(vocab.id, 'vocab', 'what', 'なに', 'nani', 'Also read なん before some sounds (e.g., なんですか).', [{ ja: 'なにですか。' }, { ja: 'おすすめはなんですか。' }], '何', 'pronoun'));
   add(makeCard(vocab.id, 'vocab', 'how', 'どう', 'dou', undefined, [{ ja: 'どうですか。' }], undefined, 'adverb'));
   add(
     makeCard(
@@ -406,6 +916,8 @@ export const makeSeedState = (): AppState => {
   add(makeCard(vocab.id, 'vocab', 'which (before a noun)', 'どの', 'dono', undefined, [{ ja: 'どのぱんがいい？' }], undefined, 'determiner'));
   add(makeCard(vocab.id, 'vocab', 'what kind of', 'どんな', 'donna', undefined, [{ ja: 'どんなぱんがいい？' }], undefined, 'determiner'));
   add(makeCard(vocab.id, 'vocab', 'a little; (soft refusal)', 'ちょっと', 'chotto', undefined, [{ ja: 'ちょっとまって。' }], undefined, 'adverb'));
+  add(makeCard(vocab.id, 'vocab', 'a little', 'すこし', 'sukoshi', undefined, [{ ja: 'すこしにほんごをはなします。' }], '少し', 'adverb'));
+  add(makeCard(vocab.id, 'vocab', 'slowly', 'ゆっくり', 'yukkuri', undefined, [{ ja: 'ゆっくりはなしてください。' }], undefined, 'adverb'));
   add(makeCard(vocab.id, 'vocab', 'really; truly', 'ほんとうに', 'hontouni', undefined, [{ ja: 'ほんとうに？' }], undefined, 'adverb'));
   add(makeCard(vocab.id, 'vocab', 'maybe; probably', 'たぶん', 'tabun', undefined, [{ ja: 'たぶんいく。' }], '多分', 'adverb'));
   add(makeCard(vocab.id, 'vocab', 'good', 'いい', 'ii', undefined, [{ ja: 'きょうはいいてんきだ。' }], undefined, 'i-adjective'));
@@ -436,8 +948,26 @@ export const makeSeedState = (): AppState => {
   add(makeCard(vocab.id, 'vocab', 'store; shop', 'みせ', 'mise', undefined, [{ ja: 'みせにいく。' }, { ja: 'みせでぱんをかう。' }], '店', 'noun'));
   add(makeCard(vocab.id, 'vocab', 'bread', 'ぱん', 'pan', undefined, [{ ja: 'ぱんをたべる。' }], 'パン', 'noun'));
 
+  add(makeCard(vocab.id, 'vocab', 'water', 'みず', 'mizu', undefined, [{ ja: 'みずをください。' }, { ja: 'みずをのむ。' }], '水', 'noun'));
+  add(makeCard(vocab.id, 'vocab', 'menu', 'めにゅう', 'menyuu', undefined, [{ ja: 'めにゅうをおねがいします。' }], 'メニュー', 'noun'));
+  add(makeCard(vocab.id, 'vocab', 'English (language)', 'えいご', 'eigo', undefined, [{ ja: 'えいごのめにゅうはありますか。' }], '英語', 'noun'));
+  add(makeCard(vocab.id, 'vocab', 'Japanese (language)', 'にほんご', 'nihongo', undefined, [{ ja: 'にほんごをはなします。' }, { ja: 'にほんごがわかりません。' }], '日本語', 'noun'));
+  add(makeCard(vocab.id, 'vocab', 'check; bill (restaurant)', 'おかいけい', 'okaikei', undefined, [{ ja: 'おかいけいおねがいします。' }], 'お会計', 'noun'));
+  add(makeCard(vocab.id, 'vocab', 'only; just', 'だけ', 'dake', undefined, [{ ja: 'みているだけです。' }], undefined, 'particle / adverb'));
+
+  add(makeCard(vocab.id, 'vocab', 'ski', 'すきい', 'sukii', undefined, [{ ja: 'すきいをしたいです。' }], 'スキー', 'noun'));
+  add(makeCard(vocab.id, 'vocab', 'lift (ski)', 'りふと', 'rifuto', undefined, [{ ja: 'りふとはどこですか。' }], 'リフト', 'noun'));
+  add(makeCard(vocab.id, 'vocab', 'rental', 'れんたる', 'rentaru', undefined, [{ ja: 'すきいをれんたるしたいです。' }], 'レンタル', 'noun'));
+  add(makeCard(vocab.id, 'vocab', 'one-day ticket', 'いちにちけん', 'ichinichi ken', undefined, [{ ja: 'りふとのいちにちけんをおねがいします。' }], '一日券', 'noun'));
+
+  add(makeCard(vocab.id, 'vocab', 'beer', 'びーる', 'biiru', undefined, [{ ja: 'びーるをください。' }], 'ビール', 'noun'));
+  add(makeCard(vocab.id, 'vocab', 'recommendation', 'おすすめ', 'osusume', undefined, [{ ja: 'おすすめはなんですか。' }], undefined, 'noun'));
+  add(makeCard(vocab.id, 'vocab', 'two (things)', 'ふたつ', 'futatsu', undefined, [{ ja: 'これをふたつください。' }], '二つ', 'counter / noun'));
+  add(makeCard(vocab.id, 'vocab', 'ski patrol', 'すきーぱとろーる', 'sukii patorooru', undefined, [{ ja: 'すきーぱとろーるをよんでください。' }], 'スキーパトロール', 'noun'));
+
   add(makeCard(vocab.id, 'vocab', 'to go', 'いく', 'iku', undefined, [{ ja: 'みせにいく。' }, { ja: 'いまいく。' }, { ja: 'あしたいく。' }], '行く', 'verb (intransitive)'));
   add(makeCard(vocab.id, 'vocab', 'to return; to go home', 'かえる', 'kaeru', undefined, [{ ja: 'いえにかえる。' }, { ja: 'よるにいえにかえる。' }], '帰る', 'verb (intransitive)'));
+  add(makeCard(vocab.id, 'vocab', 'to understand; to know', 'わかる', 'wakaru', undefined, [{ ja: 'にほんごがわかる。' }, { ja: 'にほんごがわかりません。' }], '分かる', 'verb (intransitive)'));
 
   add(makeCard(vocab.id, 'vocab', 'because; since (casual)', 'から', 'kara', undefined, [{ ja: 'あめだから、いえにいる。' }, { ja: 'じかんがないから、いかない。' }], undefined, 'particle / conjunction'));
   add(makeCard(vocab.id, 'vocab', 'if (suppose)', 'もし', 'moshi', undefined, [{ ja: 'もしひまなら、いきます。' }], undefined, 'adverb'));
@@ -462,6 +992,9 @@ export const makeSeedState = (): AppState => {
     if (!src || src.type !== 'vocab') continue;
     const pos = (src.pos ?? '').toLowerCase();
     if (!pos || !/\bverb\b/.test(pos)) continue;
+
+    const meaning = src.prompt.trim();
+    if (!meaning || !meaning.toLowerCase().startsWith('to ')) continue;
 
     const key = `${src.prompt.trim()}||${src.answer.trim()}`;
     if (addedVerbKeys.has(key)) continue;
@@ -512,79 +1045,6 @@ export const makeSeedState = (): AppState => {
       });
     }
   }
-
-  add(
-    makeCard(
-      verbs.id,
-      'verb',
-      'want to go',
-      'いきたい',
-      'ik i tai',
-      'Conjugation: いく → いき + たい (want to...). たい attaches to the verb stem and behaves like an i-adjective.',
-      undefined,
-      '行きたい',
-    ),
-  );
-  add(
-    makeCard(
-      verbs.id,
-      'verb',
-      'don’t want to go',
-      'いきたくない',
-      'ik i ta ku nai',
-      'Conjugation: いく → いき + たくない (don’t want to...). たくない is the negative of たい.',
-      undefined,
-      '行きたくない',
-    ),
-  );
-  add(
-    makeCard(
-      verbs.id,
-      'verb',
-      'want to eat',
-      'たべたい',
-      'ta be tai',
-      'Conjugation: たべる → たべ + たい (want to...). たい attaches to the verb stem and behaves like an i-adjective.',
-      undefined,
-      '食べたい',
-    ),
-  );
-  add(
-    makeCard(
-      verbs.id,
-      'verb',
-      'don’t want to eat',
-      'たべたくない',
-      'ta be ta ku nai',
-      'Conjugation: たべる → たべ + たくない (don’t want to...). たくない is the negative of たい.',
-      undefined,
-      '食べたくない',
-    ),
-  );
-  add(
-    makeCard(
-      verbs.id,
-      'verb',
-      'went (casual past of いく)',
-      'いった',
-      'it ta',
-      'Conjugation: いく → いった (casual past). This past form is irregular (not *いきた).',
-      undefined,
-      '行った',
-    ),
-  );
-  add(
-    makeCard(
-      verbs.id,
-      'verb',
-      'drank (casual past of のむ)',
-      'のんだ',
-      'non da',
-      'Conjugation: のむ → のんだ (casual past). んだ is a common past ending for む/ぶ/ぬ verbs.',
-      undefined,
-      '飲んだ',
-    ),
-  );
 
   add(
     makeCard(
@@ -929,6 +1389,103 @@ export const makeSeedState = (): AppState => {
       'いま = now\nは = topic particle\nいえ = home\nに = destination particle\nかえる = to go home\nけど = but / though\nあした = tomorrow\nみせ = store\nいく = to go\n\nStructure: [X] けど [Y] ("X, but Y")',
       undefined,
       '今は家に帰るけど明日は店に行く',
+    ),
+  );
+
+  add(
+    makeCard(
+      sentences.id,
+      'sentence',
+      'Ask for the menu. (polite)',
+      'めにゅうをおねがいします',
+      'menyuu o onegaishimasu',
+      'めにゅう = menu\nを = object particle\nおねがいします = please (request)',
+      undefined,
+      'メニューをお願いします',
+    ),
+  );
+  add(
+    makeCard(
+      sentences.id,
+      'sentence',
+      'Ask if there is an English menu.',
+      'えいごのめにゅうはありますか',
+      'eigo no menyuu wa arimasu ka',
+      'えいご = English\nの = modifier\nめにゅう = menu\nは = topic\nありますか = do you have it?',
+      undefined,
+      '英語のメニューはありますか',
+    ),
+  );
+  add(
+    makeCard(
+      sentences.id,
+      'sentence',
+      'Tell the staff you’re just looking.',
+      'みているだけです',
+      'mite iru dake desu',
+      'みている = am looking\nだけ = only\nです = polite',
+      undefined,
+      '見ているだけです',
+    ),
+  );
+  add(
+    makeCard(
+      sentences.id,
+      'sentence',
+      'Can I try this on?',
+      'これをしちゃくしてもいいですか',
+      'kore o shichaku shite mo ii desu ka',
+      'これ = this\nを = object particle\nしちゃく = try on\nしてもいいですか = may I do it?\n\nStructure: [verb te-form] も いいですか',
+      undefined,
+      'これを試着してもいいですか',
+    ),
+  );
+  add(
+    makeCard(
+      sentences.id,
+      'sentence',
+      'Ask for the check. (restaurant)',
+      'おかいけいおねがいします',
+      'okaikei onegaishimasu',
+      'おかいけい = the bill / check\nおねがいします = please',
+      undefined,
+      'お会計お願いします',
+    ),
+  );
+  add(
+    makeCard(
+      sentences.id,
+      'sentence',
+      'Order a beer. (polite)',
+      'びーるをください',
+      'biiru o kudasai',
+      'びーる = beer\nを = object particle\nください = please give me',
+      undefined,
+      'ビールをください',
+    ),
+  );
+  add(
+    makeCard(
+      sentences.id,
+      'sentence',
+      'Ask for help. (emergency)',
+      'たすけてください',
+      'tasukete kudasai',
+      'たすけて = te-form of たすける\nください = please',
+      undefined,
+      '助けてください',
+    ),
+  );
+  add(
+    makeCard(
+      sentences.id,
+      'sentence',
+      'Ask someone to call ski patrol.',
+      'すきーぱとろーるをよんでください',
+      'sukii patorooru o yonde kudasai',
+      'すきーぱとろーる = ski patrol\nを = object particle\nよんで = te-form of よぶ\nください = please',
+      undefined,
+      'スキーパトロールを呼んでください',
     ),
   );
 

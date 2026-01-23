@@ -1,5 +1,5 @@
 import { toRomaji } from 'wanakana';
-import type { AppState, Card, ExampleSentence } from './models';
+import type { AppState, Card, Deck, ExampleSentence } from './models';
 import { makeSeedState, verbConjugationHintText } from './seed';
 
 const DB_NAME = 'japanese_srs_db';
@@ -359,7 +359,41 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
 
   for (const seedDeck of Object.values(seed.decks)) {
     const existingDeckId = deckIdByName.get(seedDeck.name);
-    if (!existingDeckId) continue;
+    if (!existingDeckId) {
+      const newDeckId = `deck_${safeRandomUUID()}`;
+      const newDeck: Deck = {
+        id: newDeckId,
+        name: seedDeck.name,
+        description: seedDeck.description,
+        direction: seedDeck.direction,
+        cardIds: [],
+      };
+
+      const newCards: Record<string, Card> = {};
+      for (const seedCardId of seedDeck.cardIds) {
+        const seedCard = seed.cards[seedCardId];
+        if (!seedCard) continue;
+        const newCardId = `card_${safeRandomUUID()}`;
+        newCards[newCardId] = {
+          ...seedCard,
+          id: newCardId,
+          deckId: newDeckId,
+        };
+        newDeck.cardIds.push(newCardId);
+      }
+
+      decks = {
+        ...decks,
+        [newDeckId]: newDeck,
+      };
+      cards = {
+        ...cards,
+        ...newCards,
+      };
+      deckIdByName.set(newDeck.name, newDeckId);
+      changed = true;
+      continue;
+    }
     const existingDeck = decks[existingDeckId];
     if (!existingDeck) continue;
 
@@ -477,12 +511,28 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
       if (!c) continue;
 
       const pos = (c.pos ?? '').toLowerCase();
-      const baseKana = (c.verbBaseKana || c.answer || '').trim();
+      const baseKana = (c.verbBaseKana ?? '').trim();
+      const form = (c.verbForm ?? '').trim().toLowerCase();
+      const cue = (c.prompt ?? '').trim().toLowerCase();
 
       const isAdverb = pos.includes('adverb');
       const looksLikeVerb = looksLikeVerbBaseKana(baseKana);
+      const hasVerbPos = pos.includes('verb');
+      const hasVerbCue = cue.startsWith('to ');
+      const knownVerbForm =
+        form === 'dictionary' ||
+        form === 'polite_present' ||
+        form === 'te' ||
+        form === 'past' ||
+        form === 'negative' ||
+        form === 'past_negative' ||
+        form === 'want' ||
+        form === 'dont_want' ||
+        form === 'want_past' ||
+        form === 'dont_want_past';
+      const isGeneratedVerbCard = !!baseKana && looksLikeVerb && knownVerbForm && (hasVerbPos || hasVerbCue);
 
-      if (c.type === 'verb' && isAdverb) {
+      if (c.type === 'verb' && (isAdverb || !isGeneratedVerbCard)) {
         removedBadVerbCards.push(cardId);
         continue;
       }
@@ -517,7 +567,7 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
     srs = nextSrs;
     stats = nextStats;
     console.info(
-      `Removed ${removedBadVerbCards.length} invalid card(s) from Verb Conjugation deck (adverb misclassification cleanup).`,
+      `Removed ${removedBadVerbCards.length} invalid card(s) from Verb Conjugation deck (legacy/non-generated cleanup).`,
     );
   }
 
