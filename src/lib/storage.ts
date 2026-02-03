@@ -1,6 +1,6 @@
 import { toRomaji } from 'wanakana';
 import type { AppState, Card, Deck, ExampleSentence } from './models';
-import { makeSeedState, verbConjugationHintText } from './seed';
+import { classifyVerb, makeSeedState, verbConjugationHintText } from './seed';
 
 const DB_NAME = 'japanese_srs_db';
 const STORE = 'kv';
@@ -219,12 +219,21 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
   let exampleRepairs = 0;
   let verbHintRepairs = 0;
 
+  const sentenceWritingPromptByAnswer: Record<string, string> = {
+    'めにゅうをおねがいします': 'Menu, please. (use おねがいします)',
+    'おかいけいおねがいします': 'Check, please. (use おねがいします)',
+    'びーるをください': 'Beer, please. (use ください)',
+    'たすけてください': 'Please help! (use 〜てください)',
+    'すきーぱとろーるをよんでください': 'Please call ski patrol. (use 〜てください)',
+  };
+
   let decks = state.decks;
   let cards = state.cards;
   let srs = state.srs;
   let stats = state.stats;
   const wkApiToken = state.wkApiToken;
   const vocabPracticeFilters = state.vocabPracticeFilters;
+  const kanaPracticeFilters = state.kanaPracticeFilters;
   const repeatReviewLastAt = state.repeatReviewLastAt;
 
   for (const [cardId, card] of Object.entries(cards)) {
@@ -237,11 +246,14 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
 
     const deck = decks[nextCard.deckId];
     const isVerbConjugationDeck = (deck?.name ?? '').toLowerCase().includes('verb conjugation');
+    const isSentenceWritingDeck = (deck?.name ?? '').toLowerCase().includes('sentence writing');
     const form = (nextCard.verbForm ?? '').trim().toLowerCase();
     const knownVerbForm =
       form === 'dictionary' ||
       form === 'polite_present' ||
+      form === 'polite_negative' ||
       form === 'te' ||
+      form === 'progressive' ||
       form === 'past' ||
       form === 'negative' ||
       form === 'past_negative' ||
@@ -249,6 +261,15 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
       form === 'dont_want' ||
       form === 'want_past' ||
       form === 'dont_want_past';
+
+    if (isSentenceWritingDeck && nextCard.type === 'sentence') {
+      const ans = (nextCard.answer ?? '').trim();
+      const desired = sentenceWritingPromptByAnswer[ans];
+      if (desired && nextCard.prompt !== desired) {
+        nextCard = { ...nextCard, prompt: desired };
+        cardChanged = true;
+      }
+    }
 
     const isLegacyStrings = Array.isArray(raw) && raw.some((e) => typeof e === 'string');
     const needsExampleUpdate = isLegacyStrings || normalized.length !== deduped.length;
@@ -260,15 +281,25 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
 
     if (isVerbConjugationDeck && nextCard.type === 'verb' && knownVerbForm) {
       const note = (nextCard.note ?? '').trim();
-      const hasNewHint = note.includes('Forms:') && note.includes('Reminders:');
+      const hasNewHint =
+        note.includes('Target:') &&
+        note.includes('Base (dictionary):') &&
+        note.includes('Quick rule for this target:') &&
+        note.includes('Ending-specific rules:') &&
+        note.includes('Forms:');
       const legacyRomaji = toRomaji(nextCard.answer).trim();
       const isLegacyRomajiOnly = !!note && note === legacyRomaji;
       const isMissing = !note;
 
-      if (!hasNewHint && (isMissing || isLegacyRomajiOnly)) {
+      const shouldUpgrade = isMissing || isLegacyRomajiOnly || !hasNewHint;
+
+      if (shouldUpgrade) {
+        const baseKana = (nextCard.verbBaseKana ?? '').trim() || (nextCard.answer ?? '').trim();
+        const baseKanji = (nextCard.verbBaseKanji ?? '').trim() || undefined;
+        const cls = classifyVerb(baseKana, baseKanji);
         nextCard = {
           ...nextCard,
-          note: verbConjugationHintText(form as any, nextCard.answer),
+          note: verbConjugationHintText(form as any, baseKana, cls, nextCard.answer),
         };
         cardChanged = true;
         verbHintRepairs++;
@@ -517,12 +548,14 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
 
       const isAdverb = pos.includes('adverb');
       const looksLikeVerb = looksLikeVerbBaseKana(baseKana);
-      const hasVerbPos = pos.includes('verb');
+      const hasVerbPos = /\bverb\b/.test(pos);
       const hasVerbCue = cue.startsWith('to ');
       const knownVerbForm =
         form === 'dictionary' ||
         form === 'polite_present' ||
+        form === 'polite_negative' ||
         form === 'te' ||
+        form === 'progressive' ||
         form === 'past' ||
         form === 'negative' ||
         form === 'past_negative' ||
@@ -593,6 +626,7 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
       stats,
       wkApiToken,
       vocabPracticeFilters,
+      kanaPracticeFilters,
       repeatReviewLastAt,
     },
     changed: true,

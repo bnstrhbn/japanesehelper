@@ -66,7 +66,9 @@ const makeCard = (
 export type VerbForm =
   | 'dictionary'
   | 'polite_present'
+  | 'polite_negative'
   | 'te'
+  | 'progressive'
   | 'past'
   | 'negative'
   | 'past_negative'
@@ -82,8 +84,12 @@ export const verbFormLabel = (form: VerbForm): string => {
       return 'Present indicative (plain)';
     case 'polite_present':
       return 'Present indicative (polite) (〜ます)';
+    case 'polite_negative':
+      return 'Present negative (polite) (〜ません)';
     case 'te':
       return 'Te-form (connective) (〜て)';
+    case 'progressive':
+      return 'Progressive (〜ている)';
     case 'past':
       return 'Past indicative (plain) (〜た)';
     case 'negative':
@@ -101,18 +107,177 @@ export const verbFormLabel = (form: VerbForm): string => {
   }
 };
 
-export const verbConjugationHintText = (form: VerbForm, answerKana?: string): string => {
+export const verbConjugationHintText = (form: VerbForm, baseKana: string, cls: VerbClass, answerKana?: string): string => {
+  const base = baseKana.trim();
+  const end = lastKana(base);
+
+  const isSuru = base.endsWith('する');
+  const isKuru = base.endsWith('くる');
+  const isIku = base === 'いく';
+  const isAru = base === 'ある';
+
   const romaji = answerKana ? toRomaji(answerKana).trim() : '';
   const header = `Target: ${verbFormLabel(form)}`;
+  const baseLine = base ? `Base (dictionary): ${base}` : '';
+  const classLine = isSuru ? 'Class: Irregular (…する)' : isKuru ? 'Class: Irregular (…くる)' : `Class: ${cls === 'ichidan' ? 'Ichidan (る-verb)' : 'Godan (う-verb)'} · last kana: ${end || '—'}`;
   const romajiLine = romaji ? `Romaji: ${romaji}` : '';
+
+  const iRow: Record<string, string> = { う: 'い', く: 'き', ぐ: 'ぎ', す: 'し', つ: 'ち', ぬ: 'に', ぶ: 'び', む: 'み', る: 'り' };
+  const aRow: Record<string, string> = { う: 'わ', く: 'か', ぐ: 'が', す: 'さ', つ: 'た', ぬ: 'な', ぶ: 'ば', む: 'ま', る: 'ら' };
+  const teSuffix: Record<string, string> = { う: 'って', つ: 'って', る: 'って', む: 'んで', ぶ: 'んで', ぬ: 'んで', く: 'いて', ぐ: 'いで', す: 'して' };
+  const taSuffix: Record<string, string> = { う: 'った', つ: 'った', る: 'った', む: 'んだ', ぶ: 'んだ', ぬ: 'んだ', く: 'いた', ぐ: 'いだ', す: 'した' };
+
+  const stem = (() => {
+    if (!base) return '';
+    if (isSuru) return base.slice(0, -2);
+    if (isKuru) return base.slice(0, -2);
+    if (cls === 'ichidan') return dropLastKana(base);
+    return `${dropLastKana(base)}${iRow[end] ?? ''}`;
+  })();
+
+  const quickRule = (() => {
+    if (!base) return '';
+
+    if (form === 'dictionary') return '- Dictionary form (as-is).';
+
+    if (isSuru) {
+      const p = base.slice(0, -2);
+      const map: Record<VerbForm, string> = {
+        dictionary: `${base}`,
+        polite_present: `${p}します`,
+        polite_negative: `${p}しません`,
+        te: `${p}して`,
+        progressive: `${p}している`,
+        past: `${p}した`,
+        negative: `${p}しない`,
+        past_negative: `${p}しなかった`,
+        want: `${p}したい`,
+        dont_want: `${p}したくない`,
+        want_past: `${p}したかった`,
+        dont_want_past: `${p}したくなかった`,
+      };
+      return `- …する: ${base} → ${map[form]}`;
+    }
+
+    if (isKuru) {
+      const p = base.slice(0, -2);
+      const map: Record<VerbForm, string> = {
+        dictionary: `${base}`,
+        polite_present: `${p}きます`,
+        polite_negative: `${p}きません`,
+        te: `${p}きて`,
+        progressive: `${p}きている`,
+        past: `${p}きた`,
+        negative: `${p}こない`,
+        past_negative: `${p}こなかった`,
+        want: `${p}きたい`,
+        dont_want: `${p}きたくない`,
+        want_past: `${p}きたかった`,
+        dont_want_past: `${p}きたくなかった`,
+      };
+      return `- …くる: ${base} → ${map[form]}`;
+    }
+
+    if (isAru && (form === 'negative' || form === 'past_negative')) {
+      return form === 'negative' ? '- ある (negative): ない' : '- ある (past negative): なかった';
+    }
+
+    if (form === 'progressive') return '- Progressive: te-form + いる.';
+
+    if (cls === 'ichidan') {
+      const s = dropLastKana(base);
+      if (form === 'polite_present') return `- Ichidan: ${s} + ます`;
+      if (form === 'polite_negative') return `- Ichidan: ${s} + ません`;
+      if (form === 'te') return `- Ichidan: ${s} + て`;
+      if (form === 'past') return `- Ichidan: ${s} + た`;
+      if (form === 'negative') return `- Ichidan: ${s} + ない`;
+      if (form === 'past_negative') return `- Ichidan: ${s} + なかった`;
+      if (form === 'want') return `- Ichidan: ${s} + たい`;
+      if (form === 'dont_want') return `- Ichidan: ${s} + たくない`;
+      if (form === 'want_past') return `- Ichidan: ${s} + たかった`;
+      if (form === 'dont_want_past') return `- Ichidan: ${s} + たくなかった`;
+    }
+
+    if (cls === 'godan') {
+      const baseStem = dropLastKana(base);
+      const i = iRow[end] ?? '';
+      const a = end === 'う' ? 'わ' : aRow[end] ?? '';
+      const te = isIku ? 'いって' : `${baseStem}${teSuffix[end] ?? ''}`;
+      const ta = isIku ? 'いった' : `${baseStem}${taSuffix[end] ?? ''}`;
+
+      if (form === 'polite_present') return `- Godan: ${baseStem}${i} + ます`;
+      if (form === 'polite_negative') return `- Godan: ${baseStem}${i} + ません`;
+      if (form === 'negative') return `- Godan: ${baseStem}${a} + ない (う→わない)`;
+      if (form === 'past_negative') return `- Godan: ${baseStem}${a} + なかった (う→わなかった)`;
+      if (form === 'te') return `- Godan te-form: ${isIku ? 'いく → いって (exception)' : `${end}→${teSuffix[end] ?? ''}`}`;
+      if (form === 'past') return `- Godan past: ${isIku ? 'いく → いった (exception)' : `${end}→${taSuffix[end] ?? ''}`}`;
+      if (form === 'want') return `- Godan want: ${baseStem}${i} + たい`;
+      if (form === 'dont_want') return `- Godan want (neg): ${baseStem}${i} + たくない`;
+      if (form === 'want_past') return `- Godan want (past): ${baseStem}${i} + たかった`;
+      if (form === 'dont_want_past') return `- Godan want (past neg): ${baseStem}${i} + たくなかった`;
+      if (form === 'progressive') return `- Progressive: ${te} + いる`;
+      return '';
+    }
+
+    return '';
+  })();
+
+  const endingRules = (() => {
+    if (!base) return [] as string[];
+    if (isSuru) {
+      return [
+        `…する endings: します / しません / して / した / しない / しなかった`,
+        `Want: したい / したくない / したかった / したくなかった`,
+      ];
+    }
+    if (isKuru) {
+      return [
+        `…くる endings: きます / きません / きて / きた / こない / こなかった`,
+        `Want: きたい / きたくない / きたかった / きたくなかった`,
+      ];
+    }
+    if (cls === 'ichidan') {
+      const s = dropLastKana(base);
+      return [
+        `Ichidan: drop る → stem ${s}`,
+        `て/た: ${s}て / ${s}た`,
+        `ない/なかった: ${s}ない / ${s}なかった`,
+        `ます/ません: ${s}ます / ${s}ません`,
+        `たい-series: ${s}たい / ${s}たくない / ${s}たかった / ${s}たくなかった`,
+      ];
+    }
+
+    const baseStem = dropLastKana(base);
+    const i = iRow[end] ?? '';
+    const a = end === 'う' ? 'わ' : aRow[end] ?? '';
+    const te = isIku ? 'いって (いく exception)' : teSuffix[end] ?? '';
+    const ta = isIku ? 'いった (いく exception)' : taSuffix[end] ?? '';
+    return [
+      `Godan: ${end} → i-row ${i} (ます/たい) · a-row ${a} (ない)`,
+      `て/た endings: ${end} → ${te} / ${ta}`,
+      `Examples: ${base} → ${baseStem}${i}ます · ${baseStem}${a}ない`,
+    ];
+  })();
+
   return [
     header,
+    baseLine,
+    classLine,
     romajiLine,
+    stem ? `Stem (used for many forms): ${stem}` : '',
+    '',
+    'Quick rule for this target:',
+    quickRule,
+    '',
+    'Ending-specific rules:',
+    ...endingRules.map((s) => `- ${s}`),
     '',
     'Forms:',
     '- Present indicative (plain): dictionary form',
     '- Present indicative (polite): 〜ます',
+    '- Present negative (polite): 〜ません',
     '- Te-form (connective): 〜て',
+    '- Progressive: 〜ている (rough “-ing” / ongoing action)',
     '- Past indicative (plain): 〜た',
     '- Present negative (plain): 〜ない',
     '- Past negative (plain): 〜なかった',
@@ -120,14 +285,8 @@ export const verbConjugationHintText = (form: VerbForm, answerKana?: string): st
     '- Desiderative negative: 〜たくない',
     '- Desiderative (past): 〜たかった',
     '- Desiderative past negative: 〜たくなかった',
-    '',
-    'Reminders:',
-    '- Ichidan: drop る, then add the ending',
-    '- Godan: change the last kana (pattern depends on the ending)',
-    '- する / くる are irregular (and compounds like …する / …くる)',
-    '- 行く te/past: いって / いった (irregular)',
-    '- ある negative: ない / なかった (irregular)',
   ]
+    .filter((s) => (s ?? '').trim() !== '')
     .join('\n');
 };
 
@@ -163,6 +322,7 @@ const conjugateGodan = (base: string, form: VerbForm): string => {
   const aRow: Record<string, string> = { う: 'わ', く: 'か', ぐ: 'が', す: 'さ', つ: 'た', ぬ: 'な', ぶ: 'ば', む: 'ま', る: 'ら' };
 
   if (form === 'polite_present') return `${stem}${iRow[end] ?? ''}ます`;
+  if (form === 'polite_negative') return `${stem}${iRow[end] ?? ''}ません`;
   if (form === 'negative') return `${stem}${end === 'う' ? 'わ' : aRow[end] ?? ''}ない`;
   if (form === 'past_negative') return `${stem}${end === 'う' ? 'わ' : aRow[end] ?? ''}なかった`;
 
@@ -183,10 +343,16 @@ export const conjugateVerb = (base: string, baseKana: string, form: VerbForm, cl
   if (!b) return b;
   if (form === 'dictionary') return b;
 
+  if (form === 'progressive') {
+    const te = conjugateVerb(b, baseKana, 'te', cls);
+    return `${te}いる`;
+  }
+
   const kana = baseKana.trim();
   if (kana.endsWith('する')) {
     const prefix = b.endsWith('する') ? b.slice(0, -2) : b;
     if (form === 'polite_present') return `${prefix}します`;
+    if (form === 'polite_negative') return `${prefix}しません`;
     if (form === 'te') return `${prefix}して`;
     if (form === 'past') return `${prefix}した`;
     if (form === 'negative') return `${prefix}しない`;
@@ -200,6 +366,7 @@ export const conjugateVerb = (base: string, baseKana: string, form: VerbForm, cl
   if (kana.endsWith('くる')) {
     const prefix = b.endsWith('くる') || b.endsWith('来る') ? b.slice(0, -2) : b;
     if (form === 'polite_present') return `${prefix}きます`;
+    if (form === 'polite_negative') return `${prefix}きません`;
     if (form === 'te') return `${prefix}きて`;
     if (form === 'past') return `${prefix}きた`;
     if (form === 'negative') return `${prefix}こない`;
@@ -248,6 +415,7 @@ export const conjugateVerb = (base: string, baseKana: string, form: VerbForm, cl
 
   if (baseKana.trim() === 'ある') {
     if (form === 'polite_present') return b.replace(/る$/, 'ります');
+    if (form === 'polite_negative') return 'ありません';
     if (form === 'te') return b.replace(/る$/, 'って');
     if (form === 'past') return b.replace(/る$/, 'った');
     if (form === 'negative') return 'ない';
@@ -257,6 +425,7 @@ export const conjugateVerb = (base: string, baseKana: string, form: VerbForm, cl
   if (cls === 'ichidan') {
     const stem = dropLastKana(b);
     if (form === 'polite_present') return `${stem}ます`;
+    if (form === 'polite_negative') return `${stem}ません`;
     if (form === 'te') return `${stem}て`;
     if (form === 'past') return `${stem}た`;
     if (form === 'negative') return `${stem}ない`;
@@ -306,6 +475,7 @@ export const makeSeedState = (): AppState => {
   const vocabJaEn = makeDeck('Common Vocab (Non-WK) — JP→EN', 'Japanese → English (type meaning)', 'ja-en');
   const verbs = makeDeck('Verb Conjugation', 'English cue → Japanese conjugation (kana)', 'en-ja');
   const sentences = makeDeck('Sentence Writing', 'English → Japanese (kana)', 'en-ja');
+  const katakana = makeDeck('Katakana', 'Romaji → Katakana (main + dakuten)', 'en-ja');
   const phrases = makeDeck('Common Phrases', 'English → Japanese (common phrases; kana)', 'en-ja');
 
   const decks: AppState['decks'] = {
@@ -313,6 +483,7 @@ export const makeSeedState = (): AppState => {
     [vocabJaEn.id]: vocabJaEn,
     [verbs.id]: verbs,
     [sentences.id]: sentences,
+    [katakana.id]: katakana,
     [phrases.id]: phrases,
   };
 
@@ -322,6 +493,128 @@ export const makeSeedState = (): AppState => {
     cards[card.id] = card;
     decks[card.deckId].cardIds.push(card.id);
   };
+
+  const addKatakanaGroup = (groupKey: string, pairs: Array<[romaji: string, kata: string]>) => {
+    for (const [romaji, kata] of pairs) {
+      add(
+        makeCard(
+          katakana.id,
+          'sentence',
+          romaji,
+          kata,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          groupKey,
+        ),
+      );
+    }
+  };
+
+  addKatakanaGroup('kata_main_a', [
+    ['a', 'ア'],
+    ['i', 'イ'],
+    ['u', 'ウ'],
+    ['e', 'エ'],
+    ['o', 'オ'],
+  ]);
+  addKatakanaGroup('kata_main_ka', [
+    ['ka', 'カ'],
+    ['ki', 'キ'],
+    ['ku', 'ク'],
+    ['ke', 'ケ'],
+    ['ko', 'コ'],
+  ]);
+  addKatakanaGroup('kata_main_sa', [
+    ['sa', 'サ'],
+    ['shi', 'シ'],
+    ['su', 'ス'],
+    ['se', 'セ'],
+    ['so', 'ソ'],
+  ]);
+  addKatakanaGroup('kata_main_ta', [
+    ['ta', 'タ'],
+    ['chi', 'チ'],
+    ['tsu', 'ツ'],
+    ['te', 'テ'],
+    ['to', 'ト'],
+  ]);
+  addKatakanaGroup('kata_main_na', [
+    ['na', 'ナ'],
+    ['ni', 'ニ'],
+    ['nu', 'ヌ'],
+    ['ne', 'ネ'],
+    ['no', 'ノ'],
+  ]);
+  addKatakanaGroup('kata_main_ha', [
+    ['ha', 'ハ'],
+    ['hi', 'ヒ'],
+    ['fu', 'フ'],
+    ['he', 'ヘ'],
+    ['ho', 'ホ'],
+  ]);
+  addKatakanaGroup('kata_main_ma', [
+    ['ma', 'マ'],
+    ['mi', 'ミ'],
+    ['mu', 'ム'],
+    ['me', 'メ'],
+    ['mo', 'モ'],
+  ]);
+  addKatakanaGroup('kata_main_ya', [
+    ['ya', 'ヤ'],
+    ['yu', 'ユ'],
+    ['yo', 'ヨ'],
+  ]);
+  addKatakanaGroup('kata_main_ra', [
+    ['ra', 'ラ'],
+    ['ri', 'リ'],
+    ['ru', 'ル'],
+    ['re', 'レ'],
+    ['ro', 'ロ'],
+  ]);
+  addKatakanaGroup('kata_main_wa', [
+    ['wa', 'ワ'],
+    ['wo', 'ヲ'],
+    ['n', 'ン'],
+  ]);
+
+  addKatakanaGroup('kata_dakuten_ga', [
+    ['ga', 'ガ'],
+    ['gi', 'ギ'],
+    ['gu', 'グ'],
+    ['ge', 'ゲ'],
+    ['go', 'ゴ'],
+  ]);
+  addKatakanaGroup('kata_dakuten_za', [
+    ['za', 'ザ'],
+    ['ji', 'ジ'],
+    ['zu', 'ズ'],
+    ['ze', 'ゼ'],
+    ['zo', 'ゾ'],
+  ]);
+  addKatakanaGroup('kata_dakuten_da', [
+    ['da', 'ダ'],
+    ['di', 'ヂ'],
+    ['du', 'ヅ'],
+    ['de', 'デ'],
+    ['do', 'ド'],
+  ]);
+  addKatakanaGroup('kata_dakuten_ba', [
+    ['ba', 'バ'],
+    ['bi', 'ビ'],
+    ['bu', 'ブ'],
+    ['be', 'ベ'],
+    ['bo', 'ボ'],
+  ]);
+  addKatakanaGroup('kata_dakuten_pa', [
+    ['pa', 'パ'],
+    ['pi', 'ピ'],
+    ['pu', 'プ'],
+    ['pe', 'ペ'],
+    ['po', 'ポ'],
+  ]);
+  addKatakanaGroup('kata_dakuten_vu', [['vu', 'ヴ']]);
 
   add(
     makeCard(
@@ -1007,7 +1300,9 @@ export const makeSeedState = (): AppState => {
     const forms: VerbForm[] = [
       'dictionary',
       'polite_present',
+      'polite_negative',
       'te',
+      'progressive',
       'past',
       'negative',
       'past_negative',
@@ -1030,7 +1325,7 @@ export const makeSeedState = (): AppState => {
         'verb',
         src.prompt,
         answerKana,
-        verbConjugationHintText(form, answerKana),
+        verbConjugationHintText(form, baseKana, cls, answerKana),
         bg,
         examples,
         answerKanji,
@@ -1396,10 +1691,10 @@ export const makeSeedState = (): AppState => {
     makeCard(
       sentences.id,
       'sentence',
-      'Ask for the menu. (polite)',
+      'Menu, please. (use おねがいします)',
       'めにゅうをおねがいします',
       'menyuu o onegaishimasu',
-      'めにゅう = menu\nを = object particle\nおねがいします = please (request)',
+      'めにゅう = menu\nを = object particle\nおねがいします = please (request)\n\nStructure: [object] を おねがいします',
       undefined,
       'メニューをお願いします',
     ),
@@ -1411,7 +1706,7 @@ export const makeSeedState = (): AppState => {
       'Ask if there is an English menu.',
       'えいごのめにゅうはありますか',
       'eigo no menyuu wa arimasu ka',
-      'えいご = English\nの = modifier\nめにゅう = menu\nは = topic\nありますか = do you have it?',
+      'えいご = English\nの = modifier\nめにゅう = menu\nは = topic\nありますか = do you have it?\n\nStructure: X は ありますか',
       undefined,
       '英語のメニューはありますか',
     ),
@@ -1423,7 +1718,7 @@ export const makeSeedState = (): AppState => {
       'Tell the staff you’re just looking.',
       'みているだけです',
       'mite iru dake desu',
-      'みている = am looking\nだけ = only\nです = polite',
+      'みている = am looking\nだけ = only\nです = polite\n\nStructure: [verb (ている)] だけです',
       undefined,
       '見ているだけです',
     ),
@@ -1444,10 +1739,10 @@ export const makeSeedState = (): AppState => {
     makeCard(
       sentences.id,
       'sentence',
-      'Ask for the check. (restaurant)',
+      'Check, please. (use おねがいします)',
       'おかいけいおねがいします',
       'okaikei onegaishimasu',
-      'おかいけい = the bill / check\nおねがいします = please',
+      'おかいけい = the bill / check\nおねがいします = please\n\nStructure: [thing] おねがいします',
       undefined,
       'お会計お願いします',
     ),
@@ -1456,10 +1751,10 @@ export const makeSeedState = (): AppState => {
     makeCard(
       sentences.id,
       'sentence',
-      'Order a beer. (polite)',
+      'Beer, please. (use ください)',
       'びーるをください',
       'biiru o kudasai',
-      'びーる = beer\nを = object particle\nください = please give me',
+      'びーる = beer\nを = object particle\nください = please give me\n\nStructure: [thing] を ください',
       undefined,
       'ビールをください',
     ),
@@ -1468,10 +1763,10 @@ export const makeSeedState = (): AppState => {
     makeCard(
       sentences.id,
       'sentence',
-      'Ask for help. (emergency)',
+      'Please help! (use 〜てください)',
       'たすけてください',
       'tasukete kudasai',
-      'たすけて = te-form of たすける\nください = please',
+      'たすけて = te-form of たすける\nください = please\n\nStructure: [verb (te-form)] ください',
       undefined,
       '助けてください',
     ),
@@ -1480,12 +1775,109 @@ export const makeSeedState = (): AppState => {
     makeCard(
       sentences.id,
       'sentence',
-      'Ask someone to call ski patrol.',
+      'Please call ski patrol. (use 〜てください)',
       'すきーぱとろーるをよんでください',
       'sukii patorooru o yonde kudasai',
-      'すきーぱとろーる = ski patrol\nを = object particle\nよんで = te-form of よぶ\nください = please',
+      'すきーぱとろーる = ski patrol\nを = object particle\nよんで = te-form of よぶ\nください = please\n\nStructure: [object] を [verb (te-form)] ください',
       undefined,
       'スキーパトロールを呼んでください',
+    ),
+  );
+
+  add(
+    makeCard(
+      sentences.id,
+      'sentence',
+      'This plate, please. (use ください)',
+      'このさらをください',
+      'kono sara o kudasai',
+      'この = this (modifier)\nさら = plate\nを = object particle\nください = please give me\n\nStructure: この [thing] を ください',
+      undefined,
+      'この皿をください',
+    ),
+  );
+  add(
+    makeCard(
+      sentences.id,
+      'sentence',
+      'Two of these cups, please. (use ください)',
+      'このかっぷをふたつください',
+      'kono kappu o futatsu kudasai',
+      'この = this (modifier)\nかっぷ = cup\nを = object particle\nふたつ = two (things)\nください = please give me\n\nStructure: この [thing] を [count] ください',
+      undefined,
+      'このカップを二つください',
+    ),
+  );
+  add(
+    makeCard(
+      sentences.id,
+      'sentence',
+      'That bowl, please. (use おねがいします)',
+      'あのちゃわんをおねがいします',
+      'ano chawan o onegaishimasu',
+      'あの = that\nちゃわん = tea bowl\nを = object particle\nおねがいします = please (request)\n\nStructure: あの [object] を おねがいします',
+      undefined,
+      'あの茶碗をお願いします',
+    ),
+  );
+  add(
+    makeCard(
+      sentences.id,
+      'sentence',
+      'Please show me that pottery. (use 〜てください)',
+      'あのやきものをみせてください',
+      'ano yakimono o misete kudasai',
+      'あの = that\nやきもの = pottery\nを = object particle\nみせて = te-form of みせる (show)\nください = please\n\nStructure: [object] を [verb (te-form)] ください',
+      undefined,
+      'あの焼き物を見せてください',
+    ),
+  );
+  add(
+    makeCard(
+      sentences.id,
+      'sentence',
+      'How much is this tea cup?',
+      'このゆのみはいくらですか',
+      'kono yunomi wa ikura desu ka',
+      'この = this (modifier)\nゆのみ = teacup\nは = topic particle\nいくら = how much\nですか = question\n\nStructure: X は いくらですか',
+      undefined,
+      'この湯のみはいくらですか',
+    ),
+  );
+  add(
+    makeCard(
+      sentences.id,
+      'sentence',
+      'Do you have a small plate?',
+      'ちいさいさらはありますか',
+      'chiisai sara wa arimasu ka',
+      'ちいさい = small\nさら = plate\nは = topic particle\nありますか = do you have it?\n\nStructure: X は ありますか',
+      undefined,
+      '小さい皿はありますか',
+    ),
+  );
+  add(
+    makeCard(
+      sentences.id,
+      'sentence',
+      'Please wrap it. (use 〜てください)',
+      'つつんでください',
+      'tsutsunde kudasai',
+      'つつんで = te-form of つつむ (wrap)\nください = please\n\nStructure: [verb (te-form)] ください',
+      undefined,
+      '包んでください',
+    ),
+  );
+  add(
+    makeCard(
+      sentences.id,
+      'sentence',
+      'I want to buy a ceramic plate.',
+      'とうきのさらをかいたい',
+      'touki no sara o kaitai',
+      'とうき = ceramics\nの = of / for\nさら = plate\nを = object particle\nかいたい = want to buy\n\nStructure: [thing] を [verb stem]たい',
+      undefined,
+      '陶器の皿を買いたい',
     ),
   );
 

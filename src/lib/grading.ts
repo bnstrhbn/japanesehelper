@@ -1,8 +1,16 @@
-import { toHiragana } from 'wanakana';
+import { toHiragana, toKatakana } from 'wanakana';
 
 export const normalizeJapanese = (s: string): string => {
   const hira = toHiragana(s, { passRomaji: false });
   return hira
+    .trim()
+    .replace(/[\s　]+/g, '')
+    .replace(/[。．\.、，,！!？?「」『』（）\(\)\[\]【】]/g, '');
+};
+
+export const normalizeKatakana = (s: string): string => {
+  const kata = toKatakana(s, { passRomaji: false });
+  return kata
     .trim()
     .replace(/[\s　]+/g, '')
     .replace(/[。．\.、，,！!？?「」『』（）\(\)\[\]【】]/g, '');

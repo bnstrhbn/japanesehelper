@@ -22,6 +22,7 @@ export type Card = {
   deckId: DeckId;
   type: CardType;
   pos?: string;
+  tags?: string[];
   prompt: string;
   answer: string;
   note?: string;
@@ -54,6 +55,10 @@ export type VocabPracticeFilter = {
   categories: Record<VocabCategory, boolean>;
 };
 
+export type KanaPracticeFilter = {
+  groups: Record<string, boolean>;
+};
+
 export type AppState = {
   version: 1;
   decks: Record<DeckId, Deck>;
@@ -62,5 +67,6 @@ export type AppState = {
   stats?: Record<CardId, CardStats>;
   wkApiToken?: string;
   vocabPracticeFilters?: Record<DeckId, VocabPracticeFilter>;
+  kanaPracticeFilters?: Record<DeckId, KanaPracticeFilter>;
   repeatReviewLastAt?: Record<DeckId, number>;
 };

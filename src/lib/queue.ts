@@ -26,7 +26,9 @@ const isKnownVerbForm = (form: string | undefined): boolean => {
   switch ((form ?? '').trim().toLowerCase()) {
     case 'dictionary':
     case 'polite_present':
+    case 'polite_negative':
     case 'te':
+    case 'progressive':
     case 'past':
     case 'negative':
     case 'past_negative':
@@ -48,7 +50,7 @@ const isGeneratedVerbCard = (c: { type?: string; pos?: string; prompt?: string; 
   if (!isKnownVerbForm(c.verbForm)) return false;
   const pos = (c.pos ?? '').toLowerCase();
   const cue = (c.prompt ?? '').trim().toLowerCase();
-  return pos.includes('verb') || cue.startsWith('to ');
+  return /\bverb\b/.test(pos) || cue.startsWith('to ');
 };
 
 export const isVocabOnlyDeck = (state: AppState, deckId: DeckId): boolean => {
@@ -86,6 +88,22 @@ export const defaultVocabPracticeCategories = (): Record<VocabCategory, boolean>
   other: true,
 });
 
+const getKanaPracticeFilteredIds = (state: AppState, deckId: DeckId, ids: CardId[]): CardId[] => {
+  const filter = state.kanaPracticeFilters?.[deckId];
+  if (!filter) return ids;
+
+  const groups = filter.groups ?? {};
+  const anyEnabled = Object.values(groups).some(Boolean);
+  if (!anyEnabled) return [];
+
+  return ids.filter((id) => {
+    const c = state.cards[id];
+    const g = (c?.pos ?? '').trim();
+    if (!g) return true;
+    return !!groups[g];
+  });
+};
+
 const getVocabPracticeFilteredIds = (state: AppState, deckId: DeckId, ids: CardId[]): CardId[] => {
   const filter = state.vocabPracticeFilters?.[deckId];
   if (!filter) return ids;
@@ -116,22 +134,26 @@ const verbFormRank = (form: string | undefined): number => {
       return 0;
     case 'polite_present':
       return 1;
-    case 'te':
+    case 'polite_negative':
       return 2;
-    case 'past':
+    case 'te':
       return 3;
-    case 'negative':
+    case 'progressive':
       return 4;
-    case 'past_negative':
+    case 'past':
       return 5;
-    case 'want':
+    case 'negative':
       return 6;
-    case 'dont_want':
+    case 'past_negative':
       return 7;
-    case 'want_past':
+    case 'want':
       return 8;
-    case 'dont_want_past':
+    case 'dont_want':
       return 9;
+    case 'want_past':
+      return 10;
+    case 'dont_want_past':
+      return 11;
     default:
       return 100;
   }
@@ -150,6 +172,23 @@ const orderVerbCardsForLadder = (state: AppState, ids: CardId[]): CardId[] => {
     return a.localeCompare(b);
   });
   return sorted;
+};
+
+export const getVerbMixedQueueForPractice = (state: AppState, deckId: DeckId, _now: number, limit: number): CardId[] => {
+  const deck = state.decks[deckId];
+  if (!deck) return [];
+  if (limit <= 0) return [];
+
+  const all: CardId[] = [];
+  for (const id of deck.cardIds) {
+    const c = state.cards[id];
+    if (c && !isGeneratedVerbCard(c)) continue;
+    all.push(id);
+  }
+
+  const mixed = shuffled(all);
+  if (limit >= mixed.length) return mixed;
+  return mixed.slice(0, limit);
 };
 
 export const getVerbLadderQueueForReview = (state: AppState, deckId: DeckId, now: number): CardId[] => {
@@ -290,7 +329,11 @@ export const getPracticeCardIdsForDeck = (
     return getVerbLadderQueueForPractice(state, deckId, now, limit);
   }
 
-  const baseIds = isVocabOnlyDeck(state, deckId) ? getVocabPracticeFilteredIds(state, deckId, deck.cardIds) : deck.cardIds;
+  const name = (deck.name ?? '').toLowerCase();
+  const isKatakanaDeck = name.includes('katakana');
+
+  let baseIds = isVocabOnlyDeck(state, deckId) ? getVocabPracticeFilteredIds(state, deckId, deck.cardIds) : deck.cardIds;
+  if (isKatakanaDeck) baseIds = getKanaPracticeFilteredIds(state, deckId, baseIds);
   const baseSet = new Set(baseIds);
 
   const due = getDueCardIdsForDeck(state, deckId, now).filter((id) => baseSet.has(id));
