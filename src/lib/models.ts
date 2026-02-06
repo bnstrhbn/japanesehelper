@@ -66,6 +66,7 @@ export type AppState = {
   srs: Record<CardId, CardSrs>;
   stats?: Record<CardId, CardStats>;
   wkApiToken?: string;
+  wkLastVerbSyncAt?: number;
   vocabPracticeFilters?: Record<DeckId, VocabPracticeFilter>;
   kanaPracticeFilters?: Record<DeckId, KanaPracticeFilter>;
   repeatReviewLastAt?: Record<DeckId, number>;

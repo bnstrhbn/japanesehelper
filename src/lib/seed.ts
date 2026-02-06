@@ -299,7 +299,7 @@ export const classifyVerb = (baseKana: string, baseKanji?: string): VerbClass =>
   if (kana === 'いく') return 'godan';
   if (baseKanji && baseKanji.trim() === '要る') return 'godan';
 
-  const ruExceptions = new Set(['はいる', 'かえる']);
+  const ruExceptions = new Set(['はいる', 'かえる', 'しる']);
   if (ruExceptions.has(kana)) return 'godan';
 
   if (kana.endsWith('る')) {
@@ -1132,6 +1132,45 @@ export const makeSeedState = (): AppState => {
   add(makeCard(vocab.id, 'vocab', 'to buy', 'かう', 'kau', undefined, [{ ja: 'パンをかう。' }, { ja: 'みせでパンをかう。' }, { ja: 'これをかう。' }], '買う', 'verb (transitive)'));
   add(makeCard(vocab.id, 'vocab', 'to use', 'つかう', 'tsukau', undefined, [{ ja: 'ペンをつかう。' }, { ja: 'これをつかう。' }], '使う', 'verb (transitive)'));
   add(makeCard(vocab.id, 'vocab', 'to look; to watch', 'みる', 'miru', undefined, [{ ja: 'みる。' }, { ja: 'みているだけです。' }], '見る', 'verb (transitive)'));
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to learn; to study (学ぶ) (uses を)',
+      'まなぶ',
+      'manabu',
+      undefined,
+      [{ ja: 'にほんごをまなぶ。' }, { ja: 'がっこうでまなぶ。' }, { ja: 'れきしをまなぶ。' }],
+      '学ぶ',
+      'verb (transitive)',
+    ),
+  );
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to know (a fact/person/place); to be aware of (知る) (uses を)',
+      'しる',
+      'shiru',
+      undefined,
+      [{ ja: 'そのことをしる。' }, { ja: 'そのことを知る。' }, { ja: 'わたしはそれをしらない。' }],
+      '知る',
+      'verb (transitive)',
+    ),
+  );
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to come to like; to start liking (好きになる) (often uses が)',
+      'すきになる',
+      'suki ni naru',
+      '好き is a na-adjective, but 好きになる is a verb phrase meaning your feelings changed ("came to like"). Often: [thing] が 好きになる。',
+      [{ ja: 'にほんごがすきになった。' }, { ja: 'やさいがすきになりました。' }, { ja: 'だんだんコーヒーがすきになった。' }],
+      '好きになる',
+      'verb (intransitive)',
+    ),
+  );
   add(
     makeCard(
       vocab.id,

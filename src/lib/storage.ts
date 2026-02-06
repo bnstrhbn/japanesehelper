@@ -232,6 +232,7 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
   let srs = state.srs;
   let stats = state.stats;
   const wkApiToken = state.wkApiToken;
+  const wkLastVerbSyncAt = state.wkLastVerbSyncAt;
   let vocabPracticeFilters = state.vocabPracticeFilters;
   let kanaPracticeFilters = state.kanaPracticeFilters;
   let repeatReviewLastAt = state.repeatReviewLastAt;
@@ -836,6 +837,7 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
       srs,
       stats,
       wkApiToken,
+      wkLastVerbSyncAt,
       vocabPracticeFilters,
       kanaPracticeFilters,
       repeatReviewLastAt,

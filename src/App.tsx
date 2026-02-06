@@ -73,7 +73,7 @@ const classifyVerb = (baseKana: string, baseKanji?: string): VerbClass => {
   if (kana === 'いく') return 'godan';
   if (baseKanji && baseKanji.trim() === '要る') return 'godan';
 
-  const ruExceptions = new Set(['はいる', 'かえる']);
+  const ruExceptions = new Set(['はいる', 'かえる', 'しる']);
   if (ruExceptions.has(kana)) return 'godan';
 
   if (kana.endsWith('る')) {
@@ -167,6 +167,7 @@ export default function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadSlow, setLoadSlow] = useState(false);
   const [nowTick, setNowTick] = useState(nowMs());
+  const [wkAutoSyncBusy, setWkAutoSyncBusy] = useState(false);
 
   useEffect(() => {
     const id = window.setInterval(() => setNowTick(nowMs()), 60 * 1000);
@@ -205,6 +206,215 @@ export default function App() {
     if (!state) return;
     void saveState(state);
   }, [state]);
+
+  useEffect(() => {
+    if (!state?.wkApiToken) return;
+    if (wkAutoSyncBusy) return;
+
+    const token = state.wkApiToken;
+    const last = state.wkLastVerbSyncAt ?? 0;
+    const now = nowMs();
+    const minIntervalMs = 24 * 60 * 60 * 1000;
+    if (last && now - last < minIntervalMs) return;
+
+    let cancelled = false;
+    setWkAutoSyncBusy(true);
+
+    const wkFetchAll = async (url: string): Promise<WkSubject[]> => {
+      const out: WkSubject[] = [];
+      let next: string | null = url;
+      let guard = 0;
+      while (next) {
+        guard += 1;
+        if (guard > 50) throw new Error('Too many pages while auto-syncing WaniKani verbs.');
+
+        const res = await fetch(next, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Wanikani-Revision': '20170710',
+          },
+        });
+        if (!res.ok) {
+          const msg = res.status === 401 ? 'Unauthorized (bad/expired token).' : `WaniKani error: ${res.status}`;
+          throw new Error(msg);
+        }
+
+        const body = (await res.json()) as {
+          data?: WkSubject[];
+          pages?: { next_url?: string | null };
+        };
+        const data = Array.isArray(body.data) ? body.data : [];
+        out.push(...data);
+        next = body.pages?.next_url ?? null;
+      }
+      return out;
+    };
+
+    const wkPrimaryMeaning = (s: WkSubject): string => {
+      const ms = s.data.meanings ?? [];
+      return ms.find((m) => m.primary)?.meaning ?? ms[0]?.meaning ?? '';
+    };
+
+    const wkVerbCueMeaning = (s: WkSubject): string => {
+      const ms = s.data.meanings ?? [];
+      const list = ms.map((m) => (m.meaning ?? '').trim()).filter(Boolean);
+      const toMeaning = list.find((m) => m.toLowerCase().startsWith('to '));
+      return toMeaning ?? wkPrimaryMeaning(s);
+    };
+
+    const wkMeaningSummary = (s: WkSubject): string => {
+      const ms = s.data.meanings ?? [];
+      const list = ms.map((m) => m.meaning).filter(Boolean);
+      const uniq = [...new Set(list)];
+      return uniq.join('; ');
+    };
+
+    const wkPrimaryReading = (s: WkSubject): string => {
+      const rs = s.data.readings ?? [];
+      return rs.find((r) => r.primary)?.reading ?? rs.find((r) => r.accepted_answer)?.reading ?? rs[0]?.reading ?? '';
+    };
+
+    const makeExampleSentences = (s: WkSubject): ExampleSentence[] | undefined => {
+      const ctx = s.data.context_sentences ?? [];
+      const ex = ctx
+        .map((c) => ({ ja: (c.ja ?? '').trim(), en: (c.en ?? '').trim() }))
+        .filter((e) => e.ja);
+      return ex.length ? ex : undefined;
+    };
+
+    (async () => {
+      try {
+        const levels = [1, 2, 3, 4, 5, 6];
+        const params = new URLSearchParams({
+          types: 'vocabulary',
+          levels: levels.join(','),
+        });
+        const url = `https://api.wanikani.com/v2/subjects?${params.toString()}`;
+        const subjects = await wkFetchAll(url);
+        if (cancelled) return;
+
+        const vocabs = subjects.filter((s) => s.object === 'vocabulary');
+        const verbsOnly = vocabs.filter((s) => (s.data.parts_of_speech ?? []).some((p) => /\bverb\b/.test(p.toLowerCase())));
+
+        const syncedAt = nowMs();
+        setState((prev) => {
+          if (!prev) return prev;
+
+          const verbConjDeckEntry = Object.entries(prev.decks).find(([, d]) => (d.name ?? '').toLowerCase().includes('verb conjugation'));
+          const verbConjDeckId = verbConjDeckEntry?.[0];
+          if (!verbConjDeckId) return { ...prev, wkLastVerbSyncAt: syncedAt };
+
+          const existingKeys = new Set<string>();
+          for (const c of Object.values(prev.cards)) {
+            const k = `${c.deckId}||${c.type}||${normalizeEnglish(c.prompt)}||${normalizeJapanese(c.answer)}||${(c.kanji ?? '').trim()}`;
+            existingKeys.add(k);
+          }
+
+          const nextCards: Record<string, Card> = { ...prev.cards };
+          const nextDecks: AppState['decks'] = { ...prev.decks };
+          const deck = nextDecks[verbConjDeckId];
+          const baseCardIds = Array.isArray(deck?.cardIds) ? deck.cardIds : [];
+          const cardIds = [...baseCardIds];
+
+          const forms: Array<
+            | 'dictionary'
+            | 'polite_present'
+            | 'polite_negative'
+            | 'te'
+            | 'progressive'
+            | 'past'
+            | 'negative'
+            | 'past_negative'
+            | 'want'
+            | 'dont_want'
+            | 'want_past'
+            | 'dont_want_past'
+          > = [
+            'dictionary',
+            'polite_present',
+            'polite_negative',
+            'te',
+            'progressive',
+            'past',
+            'negative',
+            'past_negative',
+            'want',
+            'dont_want',
+            'want_past',
+            'dont_want_past',
+          ];
+
+          let addedConj = 0;
+          for (const s of verbsOnly) {
+            const kana = wkPrimaryReading(s).trim();
+            if (!kana) continue;
+            const kanji = (s.data.characters ?? '').trim() || undefined;
+            const english = wkVerbCueMeaning(s).trim();
+            if (!english) continue;
+
+            const pos = (s.data.parts_of_speech ?? []).join(', ') || 'verb';
+            const meanings = wkMeaningSummary(s);
+            const ex = makeExampleSentences(s);
+
+            const cls = classifyVerb(kana, kanji);
+            for (const form of forms) {
+              const answerKana = seedConjugateVerb(kana, kana, form as any, cls as any);
+              const answerKanji = kanji ? seedConjugateVerb(kanji, kana, form as any, cls as any) : undefined;
+              const fromDisp = kanji || kana;
+              const toDisp = answerKanji || answerKana;
+              const conjBg = `Conjugation: ${fromDisp} → ${toDisp} (${seedVerbFormLabel(form as any)}). Source: WaniKani L${s.data.level}. Meanings: ${meanings}`;
+
+              const verbCard: Card = {
+                id: makeId('card'),
+                deckId: verbConjDeckId,
+                type: 'verb',
+                pos,
+                prompt: english,
+                answer: normalizeJapanese(answerKana),
+                note: verbConjugationHintText(form as any, kana, cls as any, answerKana),
+                kanji: answerKanji,
+                background: conjBg,
+                exampleSentences: ex,
+                verbBaseKana: kana,
+                verbBaseKanji: kanji,
+                verbForm: form,
+              };
+
+              const key = `${verbCard.deckId}||${verbCard.type}||${normalizeEnglish(verbCard.prompt)}||${normalizeJapanese(verbCard.answer)}||${(verbCard.kanji ?? '').trim()}`;
+              if (existingKeys.has(key)) continue;
+              existingKeys.add(key);
+              nextCards[verbCard.id] = verbCard;
+              cardIds.push(verbCard.id);
+              addedConj += 1;
+            }
+          }
+
+          if (addedConj === 0) return { ...prev, wkLastVerbSyncAt: syncedAt };
+
+          nextDecks[verbConjDeckId] = {
+            ...deck,
+            cardIds,
+          };
+
+          console.info(`Auto-synced WaniKani verbs into Verb Conjugation. Added ${addedConj} card(s).`);
+          return {
+            ...prev,
+            cards: nextCards,
+            decks: nextDecks,
+            wkLastVerbSyncAt: syncedAt,
+          };
+        });
+      } catch (err) {
+        console.info('WaniKani auto-sync failed', err);
+      } finally {
+        if (!cancelled) setWkAutoSyncBusy(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [state?.wkApiToken, state?.wkLastVerbSyncAt, wkAutoSyncBusy]);
 
   const decks = useMemo<Deck[]>(() => {
     if (!state) return [];
@@ -2439,6 +2649,7 @@ function ManageScreen(props: {
         ...state,
         cards: nextCards,
         decks: nextDecks,
+        wkLastVerbSyncAt: nowMs(),
       });
 
       setWkImportMsg(
