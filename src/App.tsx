@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toHiragana, toKatakana, toRomaji } from 'wanakana';
 import type { ChangeEvent, KeyboardEvent } from 'react';
-import type { AppState, Card, CardId, Deck, DeckId, ExampleSentence, KanaPracticeFilter, VocabCategory, VocabPracticeFilter } from './lib/models';
+import type { AppState, Card, CardId, Deck, DeckId, ExampleSentence, VocabCategory, VocabPracticeFilter } from './lib/models';
 import { isCorrect, isCorrectEnglish, normalizeEnglish, normalizeJapanese, normalizeKatakana } from './lib/grading';
 import {
   countDueForDeck,
   defaultVocabPracticeCategories,
   getDueCardIdsForDeck,
   getPracticeCardIdsForDeck,
+  getPracticeCardIdsForDeckByTags,
+  getVerbEndingsPresentForDeck,
+  getVerbLadderQueueForVerbClass,
+  getVerbLadderQueueForVerbEnding,
+  getVerbMixedQueueForVerbClass,
+  getVerbMixedQueueForVerbEnding,
   getVerbMixedQueueForPractice,
   getVerbLadderQueueForBases,
   isVocabOnlyDeck,
@@ -23,7 +29,6 @@ type Screen =
   | { name: 'verb_rules'; deckId: DeckId }
   | { name: 'verb_browser'; deckId: DeckId }
   | { name: 'vocab_practice_settings'; deckId: DeckId }
-  | { name: 'katakana_practice_settings'; deckId: DeckId }
   | { name: 'manage' }
   | { name: 'vocab' };
 
@@ -268,18 +273,6 @@ export default function App() {
     );
   }
 
-  if (screen.name === 'katakana_practice_settings') {
-    return (
-      <KatakanaPracticeSettingsScreen
-        state={state}
-        setState={setState}
-        deckId={screen.deckId}
-        onBack={() => setScreen({ name: 'home' })}
-        onStartPractice={(queue: CardId[]) => setScreen({ name: 'review', deckId: screen.deckId, queue, idx: 0 })}
-      />
-    );
-  }
-
   const onStartReview = (deckId: DeckId) => {
     const now = nowTick;
     const queue = getDueCardIdsForDeck(state, deckId, now);
@@ -302,7 +295,6 @@ export default function App() {
     },
   ) => {
     const now = nowMs();
-    void opts;
 
     const queue = queueOverride ?? getPracticeCardIdsForDeck(state, deckId, now, 20);
     if (queue.length === 0) {
@@ -314,6 +306,16 @@ export default function App() {
     const isVerb = (deck?.name ?? '').toLowerCase().includes('verb conjugation');
     const verbMode = isVerb ? (opts?.verbMode ?? 'ladder') : undefined;
     setScreen({ name: 'review', deckId, queue, idx: 0, verbMode });
+  };
+
+  const startPracticeByTags = (deckId: DeckId, tags: string[]) => {
+    const now = nowMs();
+    const queue = getPracticeCardIdsForDeckByTags(state, deckId, now, 20, tags);
+    if (queue.length === 0) {
+      alert('No cards match this selection.');
+      return;
+    }
+    startPractice(deckId, queue);
   };
 
   const onStartPractice = (deckId: DeckId) => startPractice(deckId);
@@ -331,6 +333,14 @@ export default function App() {
       return;
     }
     startPractice(deckId, queue, { verbMode: 'mixed' });
+  };
+
+  const startVerbQuickQueue = (deckId: DeckId, queue: CardId[], verbMode: 'ladder' | 'mixed', emptyMsg: string) => {
+    if (queue.length === 0) {
+      alert(emptyMsg);
+      return;
+    }
+    startPractice(deckId, queue, { verbMode });
   };
 
   const onOpenVerbRules = (deckId: DeckId) => {
@@ -429,8 +439,18 @@ export default function App() {
         {decks.map((d: Deck) => {
           const due = countDueForDeck(state, d.id, now);
           const isVerbConjugation = d.name.toLowerCase().includes('verb conjugation');
+          const isPhrasesAndSentences = d.name.toLowerCase().includes('phrases') && d.name.toLowerCase().includes('sentenc');
           const isVocabOnly = isVocabOnlyDeck(state, d.id);
-          const isKatakana = d.name.toLowerCase().includes('katakana');
+          const verbEndings = isVerbConjugation ? getVerbEndingsPresentForDeck(state, d.id) : [];
+          const orderedVerbEndings = (() => {
+            if (!verbEndings.length) return [] as string[];
+            const order = ['う', 'く', 'ぐ', 'す', 'つ', 'ぬ', 'ぶ', 'む', 'る', 'する', 'くる'];
+            const idx = (e: string) => {
+              const i = order.indexOf(e);
+              return i === -1 ? 1e9 : i;
+            };
+            return [...verbEndings].sort((a, b) => idx(a) - idx(b) || a.localeCompare(b));
+          })();
           const totals = d.cardIds.reduce(
             (acc, id) => {
               const st = state.stats?.[id];
@@ -473,12 +493,120 @@ export default function App() {
                   </button>
                 ) : null}
                 {isVocabOnly ? <button onClick={() => setScreen({ name: 'vocab_practice_settings', deckId: d.id })}>Types</button> : null}
-                {isKatakana ? (
-                  <button onClick={() => setScreen({ name: 'katakana_practice_settings', deckId: d.id })}>Groups</button>
-                ) : null}
                 {isVerbConjugation ? <button onClick={() => onOpenVerbRules(d.id)}>Rules</button> : null}
                 {isVerbConjugation ? <button onClick={() => onOpenVerbBrowser(d.id)}>Verbs</button> : null}
               </div>
+
+
+              {isVerbConjugation ? (
+                <div style={{ marginTop: 8, display: 'grid', gap: 8 }}>
+                  <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                    <div className="small" style={{ fontWeight: 800 }}>
+                      Verb subsets
+                    </div>
+                    <button
+                      onClick={() =>
+                        startVerbQuickQueue(
+                          d.id,
+                          getVerbLadderQueueForVerbClass(state, d.id, 'ichidan'),
+                          'ladder',
+                          'No Ichidan verbs found.',
+                        )
+                      }
+                      title="Ichidan-only ladders"
+                    >
+                      Ichidan · Ladder
+                    </button>
+                    <button
+                      onClick={() =>
+                        startVerbQuickQueue(
+                          d.id,
+                          getVerbMixedQueueForVerbClass(state, d.id, 'ichidan', 20),
+                          'mixed',
+                          'No Ichidan verbs found.',
+                        )
+                      }
+                      title="Ichidan-only mixed (random forms)"
+                    >
+                      Ichidan · Mixed
+                    </button>
+                    <button
+                      onClick={() =>
+                        startVerbQuickQueue(
+                          d.id,
+                          getVerbLadderQueueForVerbClass(state, d.id, 'godan'),
+                          'ladder',
+                          'No Godan verbs found.',
+                        )
+                      }
+                      title="Godan-only ladders"
+                    >
+                      Godan · Ladder
+                    </button>
+                    <button
+                      onClick={() =>
+                        startVerbQuickQueue(
+                          d.id,
+                          getVerbMixedQueueForVerbClass(state, d.id, 'godan', 20),
+                          'mixed',
+                          'No Godan verbs found.',
+                        )
+                      }
+                      title="Godan-only mixed (random forms)"
+                    >
+                      Godan · Mixed
+                    </button>
+                  </div>
+
+                  {orderedVerbEndings.length ? (
+                    <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                      <div className="small" style={{ fontWeight: 800 }}>
+                        By ending
+                      </div>
+                      {orderedVerbEndings.map((e) => (
+                        <div key={`ending_${e}`} className="row" style={{ gap: 6 }}>
+                          <button
+                            onClick={() =>
+                              startVerbQuickQueue(
+                                d.id,
+                                getVerbLadderQueueForVerbEnding(state, d.id, e),
+                                'ladder',
+                                `No verbs found ending with ${e}.`,
+                              )
+                            }
+                            title={`Ending ${e} ladders`}
+                          >
+                            {e} · Ladder
+                          </button>
+                          <button
+                            onClick={() =>
+                              startVerbQuickQueue(
+                                d.id,
+                                getVerbMixedQueueForVerbEnding(state, d.id, e, 20),
+                                'mixed',
+                                `No verbs found ending with ${e}.`,
+                              )
+                            }
+                            title={`Ending ${e} mixed (random forms)`}
+                          >
+                            {e} · Mixed
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {isPhrasesAndSentences ? (
+                <div className="row" style={{ marginTop: 8, gap: 8, flexWrap: 'wrap' }}>
+                  <button onClick={() => startPracticeByTags(d.id, ['greeting'])}>Greeting</button>
+                  <button onClick={() => startPracticeByTags(d.id, ['restaurant'])}>Restaurants</button>
+                  <button onClick={() => startPracticeByTags(d.id, ['shopping'])}>Shopping</button>
+                  <button onClick={() => startPracticeByTags(d.id, ['skiing'])}>Skiing</button>
+                  <button onClick={() => startPracticeByTags(d.id, ['advanced'])}>Advanced</button>
+                </div>
+              ) : null}
             </div>
           );
         })}
@@ -659,192 +787,6 @@ function VocabPracticeSettingsScreen(props: {
               </div>
             </label>
           ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function KatakanaPracticeSettingsScreen(props: {
-  state: AppState;
-  setState: (s: AppState) => void;
-  deckId: DeckId;
-  onBack: () => void;
-  onStartPractice: (queue: CardId[]) => void;
-}) {
-  const { state, setState, deckId, onBack, onStartPractice } = props;
-  const deck = state.decks[deckId];
-
-  const groupDefs = useMemo(
-    () => {
-      const main: Array<{ key: string; label: string }> = [
-        { key: 'kata_main_a', label: 'ア/a' },
-        { key: 'kata_main_ka', label: 'カ/ka' },
-        { key: 'kata_main_sa', label: 'サ/sa' },
-        { key: 'kata_main_ta', label: 'タ/ta' },
-        { key: 'kata_main_na', label: 'ナ/na' },
-        { key: 'kata_main_ha', label: 'ハ/ha' },
-        { key: 'kata_main_ma', label: 'マ/ma' },
-        { key: 'kata_main_ya', label: 'ヤ/ya' },
-        { key: 'kata_main_ra', label: 'ラ/ra' },
-        { key: 'kata_main_wa', label: 'ワ/wa' },
-      ];
-      const dakuten: Array<{ key: string; label: string }> = [
-        { key: 'kata_dakuten_ga', label: 'ガ/ga' },
-        { key: 'kata_dakuten_za', label: 'ザ/za' },
-        { key: 'kata_dakuten_da', label: 'ダ/da' },
-        { key: 'kata_dakuten_ba', label: 'バ/ba' },
-        { key: 'kata_dakuten_pa', label: 'パ/pa' },
-        { key: 'kata_dakuten_vu', label: 'ヴ/vu' },
-      ];
-      return { main, dakuten };
-    },
-    [],
-  );
-
-  const initial: KanaPracticeFilter = useMemo(() => {
-    const existing = state.kanaPracticeFilters?.[deckId];
-    if (existing?.groups) return existing;
-    const allKeys = [...groupDefs.main, ...groupDefs.dakuten].map((g) => g.key);
-    return { groups: Object.fromEntries(allKeys.map((k) => [k, true])) } as KanaPracticeFilter;
-  }, [deckId, groupDefs.dakuten, groupDefs.main, state.kanaPracticeFilters]);
-
-  const [groups, setGroups] = useState<Record<string, boolean>>(initial.groups);
-
-  useEffect(() => {
-    setGroups(initial.groups);
-  }, [initial]);
-
-  const counts = useMemo(() => {
-    const out: Record<string, number> = {};
-    if (!deck) return out;
-    for (const id of deck.cardIds) {
-      const c = state.cards[id];
-      const k = (c?.pos ?? '').trim();
-      if (!k) continue;
-      out[k] = (out[k] ?? 0) + 1;
-    }
-    return out;
-  }, [deck, state.cards]);
-
-  const setAll = (keys: string[], v: boolean) => {
-    setGroups((prev) => {
-      const next = { ...prev };
-      for (const k of keys) next[k] = v;
-      return next;
-    });
-  };
-
-  const save = (): AppState => {
-    const next: AppState = {
-      ...state,
-      kanaPracticeFilters: {
-        ...(state.kanaPracticeFilters ?? {}),
-        [deckId]: { groups },
-      },
-    };
-    setState(next);
-    return next;
-  };
-
-  const start = () => {
-    const anyEnabled = Object.values(groups).some(Boolean);
-    if (!anyEnabled) {
-      alert('Select at least one group.');
-      return;
-    }
-    const nextState = save();
-    const now = nowMs();
-    const queue = getPracticeCardIdsForDeck(nextState, deckId, now, 20);
-    if (queue.length === 0) {
-      alert('No cards match this selection.');
-      return;
-    }
-    onStartPractice(queue);
-  };
-
-  if (!deck) {
-    return (
-      <div className="container">
-        <div className="header">
-          <div className="brand">
-            <div className="logo" />
-            <div>
-              <div style={{ fontWeight: 900, fontSize: 18 }}>Katakana practice</div>
-              <div className="small">Missing deck.</div>
-            </div>
-          </div>
-          <div className="row">
-            <button onClick={onBack}>Back</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const allMainKeys = groupDefs.main.map((g) => g.key);
-  const allDakutenKeys = groupDefs.dakuten.map((g) => g.key);
-  const allKeys = [...allMainKeys, ...allDakutenKeys];
-
-  const renderGroupButtons = (defs: Array<{ key: string; label: string }>) => (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
-      {defs.map((g) => (
-        <button
-          key={g.key}
-          onClick={() => setGroups((prev) => ({ ...prev, [g.key]: !prev[g.key] }))}
-          className={groups[g.key] ? 'primary' : undefined}
-          title={groups[g.key] ? 'Included' : 'Excluded'}
-        >
-          {g.label}
-          <span className="small"> ({counts[g.key] ?? 0})</span>
-        </button>
-      ))}
-    </div>
-  );
-
-  return (
-    <div className="container">
-      <div className="header">
-        <div className="brand">
-          <div className="logo" />
-          <div>
-            <div style={{ fontWeight: 900, fontSize: 18 }}>Katakana practice groups</div>
-            <div className="small">{deck.name}</div>
-          </div>
-        </div>
-        <div className="row">
-          <button onClick={onBack}>Back</button>
-        </div>
-      </div>
-
-      <div className="card">
-        <div style={{ fontWeight: 900 }}>Choose what to practice</div>
-        <div className="small" style={{ marginTop: 6 }}>
-          This filters <b>Practice</b> for this deck. Review (due) is unchanged.
-        </div>
-
-        <div className="row" style={{ marginTop: 10, gap: 8, flexWrap: 'wrap' }}>
-          <button onClick={() => setAll(allKeys, true)}>All</button>
-          <button onClick={() => setAll(allKeys, false)}>None</button>
-          <button onClick={() => setAll(allMainKeys, true)}>All main</button>
-          <button onClick={() => setAll(allDakutenKeys, true)}>All dakuten</button>
-          <div style={{ flex: 1 }} />
-          <button onClick={() => save()}>Save</button>
-          <button className="primary" onClick={start}>
-            Start practice
-          </button>
-        </div>
-
-        <div style={{ marginTop: 14, display: 'grid', gap: 14 }}>
-          <div>
-            <div style={{ fontWeight: 900, marginBottom: 8 }}>Main kana</div>
-            {renderGroupButtons(groupDefs.main)}
-          </div>
-
-          <div>
-            <div style={{ fontWeight: 900, marginBottom: 8 }}>Dakuten kana</div>
-            {renderGroupButtons(groupDefs.dakuten)}
-          </div>
         </div>
       </div>
     </div>
@@ -1247,6 +1189,9 @@ function ReviewScreen(props: {
   const answerIsJapanese = direction !== 'ja-en';
   const promptIsJapanese = direction === 'ja-en';
 
+  const deckName = (deck?.name ?? '').toLowerCase();
+  const isPhrasesAndSentencesDeck = deckName.includes('phrases') && deckName.includes('sentenc');
+
   const isKatakanaDeck = (deck?.name ?? '').toLowerCase().includes('katakana');
 
   const isVerbConjugationDeck = (deck?.name ?? '').toLowerCase().includes('verb conjugation');
@@ -1410,7 +1355,7 @@ function ReviewScreen(props: {
   const isVerbGroupSkipped = !!verbGroupKey && !!skippedVerbGroupKeys[verbGroupKey];
 
   const isSentenceWriting =
-    card.type === 'sentence' && direction === 'en-ja' && (deck?.name ?? '').toLowerCase().includes('sentence writing');
+    card.type === 'sentence' && direction === 'en-ja' && (deckName.includes('sentence writing') || isPhrasesAndSentencesDeck);
 
   const sentenceTextForParticleNotes = card.type === 'sentence' ? (card.kanji || card.answer || '').trim() : '';
   const hasParticleWa = sentenceTextForParticleNotes.includes('は');

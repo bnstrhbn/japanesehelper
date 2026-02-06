@@ -1,5 +1,6 @@
 import type { AppState, CardId, DeckId, VocabCategory } from './models';
 import { defaultSrs } from './srs';
+import { classifyVerb } from './seed';
 
 const shuffled = <T>(arr: T[]): T[] => {
   const a = [...arr];
@@ -61,8 +62,8 @@ export const isVocabOnlyDeck = (state: AppState, deckId: DeckId): boolean => {
 
 export const vocabCategoryForPos = (posRaw: string | undefined): VocabCategory => {
   const pos = (posRaw ?? '').toLowerCase();
-  if (pos.includes('verb')) return 'verb';
-  if (pos.includes('adverb')) return 'adverb';
+  if (/\badverb\b/.test(pos)) return 'adverb';
+  if (/\bverb\b/.test(pos)) return 'verb';
   if (pos.includes('adjective')) return 'adjective';
   if (pos.includes('noun') || pos.includes('pronoun')) return 'noun';
   if (
@@ -88,22 +89,6 @@ export const defaultVocabPracticeCategories = (): Record<VocabCategory, boolean>
   other: true,
 });
 
-const getKanaPracticeFilteredIds = (state: AppState, deckId: DeckId, ids: CardId[]): CardId[] => {
-  const filter = state.kanaPracticeFilters?.[deckId];
-  if (!filter) return ids;
-
-  const groups = filter.groups ?? {};
-  const anyEnabled = Object.values(groups).some(Boolean);
-  if (!anyEnabled) return [];
-
-  return ids.filter((id) => {
-    const c = state.cards[id];
-    const g = (c?.pos ?? '').trim();
-    if (!g) return true;
-    return !!groups[g];
-  });
-};
-
 const getVocabPracticeFilteredIds = (state: AppState, deckId: DeckId, ids: CardId[]): CardId[] => {
   const filter = state.vocabPracticeFilters?.[deckId];
   if (!filter) return ids;
@@ -126,6 +111,84 @@ const verbBaseKey = (state: AppState, cardId: CardId): string => {
   const baseKanji = (c?.verbBaseKanji || '').trim();
   const raw = `${baseKanji}||${baseKana}`.trim();
   return raw && raw !== '||' ? raw : cardId;
+};
+
+type VerbBaseEntry = {
+  baseKey: string;
+  baseKana: string;
+  baseKanji?: string;
+  cls: 'ichidan' | 'godan';
+  ending: string;
+};
+
+const normalizeVerbBaseKana = (s: string): string => {
+  return (s ?? '').trim().replace(/\s+/g, '');
+};
+
+const verbEndingForBaseKana = (baseKana: string): string => {
+  const b = normalizeVerbBaseKana(baseKana);
+  if (!b) return '';
+  if (b.endsWith('する')) return 'する';
+  if (b.endsWith('くる')) return 'くる';
+  return b.slice(-1);
+};
+
+const getVerbDictionaryBases = (state: AppState, deckId: DeckId): VerbBaseEntry[] => {
+  const deck = state.decks[deckId];
+  if (!deck) return [];
+
+  const out = new Map<string, VerbBaseEntry>();
+  for (const id of deck.cardIds) {
+    const c = state.cards[id];
+    if (!c || !isGeneratedVerbCard(c)) continue;
+
+    const form = (c.verbForm ?? '').toLowerCase().trim();
+    if (form !== 'dictionary') continue;
+
+    const baseKana = normalizeVerbBaseKana(c.verbBaseKana ?? '');
+    if (!baseKana) continue;
+    const baseKanji = (c.verbBaseKanji ?? '').trim() || undefined;
+    const baseKeyRaw = `${(baseKanji ?? '').trim()}||${baseKana}`.trim();
+    const baseKey = baseKeyRaw && baseKeyRaw !== '||' ? baseKeyRaw : id;
+
+    if (out.has(baseKey)) continue;
+
+    out.set(baseKey, {
+      baseKey,
+      baseKana,
+      baseKanji,
+      cls: classifyVerb(baseKana, baseKanji),
+      ending: verbEndingForBaseKana(baseKana),
+    });
+  }
+
+  const list = [...out.values()];
+  list.sort((a, b) => a.baseKana.localeCompare(b.baseKana));
+  return list;
+};
+
+export const getVerbEndingsPresentForDeck = (state: AppState, deckId: DeckId): string[] => {
+  const bases = getVerbDictionaryBases(state, deckId);
+  const out = new Set<string>();
+  for (const b of bases) {
+    const e = (b.ending ?? '').trim();
+    if (e) out.add(e);
+  }
+  return [...out.values()].sort((a, b) => a.localeCompare(b));
+};
+
+export const getVerbBaseKeysForVerbClass = (state: AppState, deckId: DeckId, cls: 'ichidan' | 'godan'): string[] => {
+  return getVerbDictionaryBases(state, deckId)
+    .filter((b) => b.cls === cls)
+    .map((b) => b.baseKey);
+};
+
+export const getVerbBaseKeysForVerbEnding = (state: AppState, deckId: DeckId, ending: string): string[] => {
+  const e = (ending ?? '').trim();
+  if (!e) return [];
+  return getVerbDictionaryBases(state, deckId)
+    .filter((b) => b.ending === e)
+    .map((b) => b.baseKey);
 };
 
 const verbFormRank = (form: string | undefined): number => {
@@ -294,6 +357,59 @@ export const getVerbLadderQueueForBases = (state: AppState, deckId: DeckId, orde
   return groups.flatMap((g) => g.ids);
 };
 
+export const getVerbMixedQueueForBases = (state: AppState, deckId: DeckId, baseKeys: string[], limit: number): CardId[] => {
+  const deck = state.decks[deckId];
+  if (!deck) return [];
+  if (limit <= 0) return [];
+
+  const wanted = baseKeys.map((k) => (k ?? '').trim()).filter(Boolean);
+  if (wanted.length === 0) return [];
+  const wantedSet = new Set(wanted);
+
+  const all: CardId[] = [];
+  for (const id of deck.cardIds) {
+    const c = state.cards[id];
+    if (c && !isGeneratedVerbCard(c)) continue;
+    const base = verbBaseKey(state, id);
+    if (!wantedSet.has(base)) continue;
+    all.push(id);
+  }
+
+  const mixed = shuffled(all);
+  if (limit >= mixed.length) return mixed;
+  return mixed.slice(0, limit);
+};
+
+export const getVerbLadderQueueForVerbClass = (state: AppState, deckId: DeckId, cls: 'ichidan' | 'godan'): CardId[] => {
+  const bases = getVerbBaseKeysForVerbClass(state, deckId, cls);
+  return getVerbLadderQueueForBases(state, deckId, bases);
+};
+
+export const getVerbMixedQueueForVerbClass = (
+  state: AppState,
+  deckId: DeckId,
+  cls: 'ichidan' | 'godan',
+  limit: number,
+): CardId[] => {
+  const bases = getVerbBaseKeysForVerbClass(state, deckId, cls);
+  return getVerbMixedQueueForBases(state, deckId, bases, limit);
+};
+
+export const getVerbLadderQueueForVerbEnding = (state: AppState, deckId: DeckId, ending: string): CardId[] => {
+  const bases = getVerbBaseKeysForVerbEnding(state, deckId, ending);
+  return getVerbLadderQueueForBases(state, deckId, bases);
+};
+
+export const getVerbMixedQueueForVerbEnding = (
+  state: AppState,
+  deckId: DeckId,
+  ending: string,
+  limit: number,
+): CardId[] => {
+  const bases = getVerbBaseKeysForVerbEnding(state, deckId, ending);
+  return getVerbMixedQueueForBases(state, deckId, bases, limit);
+};
+
 export const getDueCardIdsForDeck = (state: AppState, deckId: DeckId, now: number): CardId[] => {
   const deck = state.decks[deckId];
   if (!deck) return [];
@@ -329,11 +445,7 @@ export const getPracticeCardIdsForDeck = (
     return getVerbLadderQueueForPractice(state, deckId, now, limit);
   }
 
-  const name = (deck.name ?? '').toLowerCase();
-  const isKatakanaDeck = name.includes('katakana');
-
-  let baseIds = isVocabOnlyDeck(state, deckId) ? getVocabPracticeFilteredIds(state, deckId, deck.cardIds) : deck.cardIds;
-  if (isKatakanaDeck) baseIds = getKanaPracticeFilteredIds(state, deckId, baseIds);
+  const baseIds = isVocabOnlyDeck(state, deckId) ? getVocabPracticeFilteredIds(state, deckId, deck.cardIds) : deck.cardIds;
   const baseSet = new Set(baseIds);
 
   const due = getDueCardIdsForDeck(state, deckId, now).filter((id) => baseSet.has(id));
@@ -363,5 +475,55 @@ export const getPracticeCardIdsForDeck = (
 
   const merged = [...due, ...othersShuffled];
   if (limit <= 0 || limit >= merged.length) return merged;
+  return merged.slice(0, limit);
+};
+
+export const getPracticeCardIdsForDeckByTags = (
+  state: AppState,
+  deckId: DeckId,
+  now: number,
+  limit: number,
+  tags: string[],
+): CardId[] => {
+  const deck = state.decks[deckId];
+  if (!deck) return [];
+  if (limit <= 0) return [];
+  const wanted = tags.map((t) => (t ?? '').trim()).filter(Boolean);
+  if (wanted.length === 0) return getPracticeCardIdsForDeck(state, deckId, now, limit);
+
+  const baseIds = deck.cardIds.filter((id) => {
+    const c = state.cards[id];
+    const ts = c?.tags ?? [];
+    if (!Array.isArray(ts) || ts.length === 0) return false;
+    return wanted.some((t) => ts.includes(t));
+  });
+
+  const baseSet = new Set(baseIds);
+  const due = getDueCardIdsForDeck(state, deckId, now).filter((id) => baseSet.has(id));
+  const dueSet = new Set(due);
+  const others = baseIds.filter((id) => !dueSet.has(id));
+
+  const byReviews = new Map<number, CardId[]>();
+  for (const id of others) {
+    const r = state.stats?.[id]?.reviews ?? 0;
+    const bucket = byReviews.get(r) ?? [];
+    bucket.push(id);
+    byReviews.set(r, bucket);
+  }
+
+  const reviewCounts = [...byReviews.keys()].sort((a, b) => a - b);
+  const othersShuffled: CardId[] = [];
+  for (const r of reviewCounts) {
+    const bucket = byReviews.get(r) ?? [];
+    bucket.sort((a, b) => {
+      const ad = (state.srs[a] ?? defaultSrs(a, now)).due;
+      const bd = (state.srs[b] ?? defaultSrs(b, now)).due;
+      return ad - bd;
+    });
+    othersShuffled.push(...shuffled(bucket));
+  }
+
+  const merged = [...due, ...othersShuffled];
+  if (limit >= merged.length) return merged;
   return merged.slice(0, limit);
 };

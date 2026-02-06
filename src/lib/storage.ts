@@ -232,9 +232,9 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
   let srs = state.srs;
   let stats = state.stats;
   const wkApiToken = state.wkApiToken;
-  const vocabPracticeFilters = state.vocabPracticeFilters;
-  const kanaPracticeFilters = state.kanaPracticeFilters;
-  const repeatReviewLastAt = state.repeatReviewLastAt;
+  let vocabPracticeFilters = state.vocabPracticeFilters;
+  let kanaPracticeFilters = state.kanaPracticeFilters;
+  let repeatReviewLastAt = state.repeatReviewLastAt;
 
   for (const [cardId, card] of Object.entries(cards)) {
     const raw = (card as unknown as { exampleSentences?: unknown }).exampleSentences;
@@ -245,8 +245,10 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
     let cardChanged = false;
 
     const deck = decks[nextCard.deckId];
-    const isVerbConjugationDeck = (deck?.name ?? '').toLowerCase().includes('verb conjugation');
-    const isSentenceWritingDeck = (deck?.name ?? '').toLowerCase().includes('sentence writing');
+    const deckName = (deck?.name ?? '').toLowerCase();
+    const isVerbConjugationDeck = deckName.includes('verb conjugation');
+    const isSentenceWritingDeck =
+      deckName.includes('sentence writing') || (deckName.includes('phrases') && deckName.includes('sentenc'));
     const form = (nextCard.verbForm ?? '').trim().toLowerCase();
     const knownVerbForm =
       form === 'dictionary' ||
@@ -465,54 +467,263 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
     }
   }
 
+  {
+    const combinedDeckId = deckIdByName.get('Phrases & Sentences');
+    const legacyDeckIds = Object.entries(decks)
+      .filter(([deckId, d]) => {
+        if (!combinedDeckId || deckId === combinedDeckId) return false;
+        const n = (d.name ?? '').toLowerCase();
+        return n.includes('sentence writing') || n.includes('common phrases');
+      })
+      .map(([deckId]) => deckId);
+
+    if (combinedDeckId && legacyDeckIds.length > 0) {
+      const combinedDeck = decks[combinedDeckId];
+      if (combinedDeck) {
+        let combinedCardIds = [...combinedDeck.cardIds];
+        const keyToCardId = new Map<string, string>();
+        for (const id of combinedCardIds) {
+          const c = cards[id];
+          if (!c) continue;
+          keyToCardId.set(cardSeedKey(c), id);
+        }
+
+        const removedCardIds: string[] = [];
+        const removedDeckIds: string[] = [];
+
+        const hasProgress = (id: string): boolean => {
+          if (srs[id]) return true;
+          const st = stats?.[id];
+          return !!st && (st.reviews ?? 0) > 0;
+        };
+
+        for (const legacyDeckId of legacyDeckIds) {
+          const legacyDeck = decks[legacyDeckId];
+          if (!legacyDeck) continue;
+          removedDeckIds.push(legacyDeckId);
+
+          for (const cardId of legacyDeck.cardIds) {
+            const card = cards[cardId];
+            if (!card) continue;
+
+            const key = cardSeedKey(card);
+            const existingId = keyToCardId.get(key);
+            if (!existingId) {
+              cards = {
+                ...cards,
+                [cardId]: {
+                  ...card,
+                  deckId: combinedDeckId,
+                },
+              };
+              combinedCardIds = [...combinedCardIds, cardId];
+              keyToCardId.set(key, cardId);
+              changed = true;
+              continue;
+            }
+
+            const keepExisting = hasProgress(existingId) || !hasProgress(cardId);
+            if (keepExisting) {
+              removedCardIds.push(cardId);
+              changed = true;
+              continue;
+            }
+
+            removedCardIds.push(existingId);
+            combinedCardIds = combinedCardIds.filter((id) => id !== existingId);
+
+            cards = {
+              ...cards,
+              [cardId]: {
+                ...card,
+                deckId: combinedDeckId,
+              },
+            };
+            combinedCardIds = [...combinedCardIds, cardId];
+            keyToCardId.set(key, cardId);
+            changed = true;
+          }
+        }
+
+        if (removedCardIds.length > 0) {
+          const nextCards = { ...cards };
+          const nextSrs = { ...srs };
+          const nextStats = { ...(stats ?? {}) };
+          for (const id of removedCardIds) {
+            delete nextCards[id];
+            delete nextSrs[id];
+            delete nextStats[id];
+          }
+          cards = nextCards;
+          srs = nextSrs;
+          stats = nextStats;
+        }
+
+        if (removedDeckIds.length > 0) {
+          const nextDecks = { ...decks };
+          for (const id of removedDeckIds) delete nextDecks[id];
+          decks = nextDecks;
+
+          if (repeatReviewLastAt) {
+            const next = { ...repeatReviewLastAt };
+            for (const id of removedDeckIds) delete next[id];
+            repeatReviewLastAt = next;
+          }
+          if (vocabPracticeFilters) {
+            const next = { ...vocabPracticeFilters };
+            for (const id of removedDeckIds) delete next[id];
+            vocabPracticeFilters = next;
+          }
+          if (kanaPracticeFilters) {
+            const next = { ...kanaPracticeFilters };
+            for (const id of removedDeckIds) delete next[id];
+            kanaPracticeFilters = next;
+          }
+
+          changed = true;
+        }
+
+        decks = {
+          ...decks,
+          [combinedDeckId]: {
+            ...combinedDeck,
+            cardIds: combinedCardIds,
+          },
+        };
+      }
+    }
+  }
+
+  {
+    const seedKataDeck = Object.values(seed.decks).find((d) => (d.name ?? '').toLowerCase().includes('katakana'));
+    const katakanaDeckId = Object.entries(decks).find(([, d]) => (d.name ?? '').toLowerCase().includes('katakana'))?.[0];
+
+    if (seedKataDeck && katakanaDeckId) {
+      const keepKeys = new Set<string>();
+      for (const seedCardId of seedKataDeck.cardIds) {
+        const sc = seed.cards[seedCardId];
+        if (!sc) continue;
+        keepKeys.add(cardSeedKey(sc));
+      }
+
+      const deck = decks[katakanaDeckId];
+      if (deck) {
+        const removed: string[] = [];
+        const kept = deck.cardIds.filter((id) => {
+          const c = cards[id];
+          if (!c) return false;
+          const ok = keepKeys.has(cardSeedKey(c));
+          if (!ok) removed.push(id);
+          return ok;
+        });
+
+        if (removed.length > 0 || kept.length !== deck.cardIds.length) {
+          decks = {
+            ...decks,
+            [katakanaDeckId]: {
+              ...deck,
+              cardIds: kept,
+            },
+          };
+          changed = true;
+        }
+
+        if (removed.length > 0) {
+          const nextCards = { ...cards };
+          const nextSrs = { ...srs };
+          const nextStats = { ...(stats ?? {}) };
+          for (const id of removed) {
+            delete nextCards[id];
+            delete nextSrs[id];
+            delete nextStats[id];
+          }
+          cards = nextCards;
+          srs = nextSrs;
+          stats = nextStats;
+        }
+
+        if (kanaPracticeFilters?.[katakanaDeckId]) {
+          const next = { ...kanaPracticeFilters };
+          delete next[katakanaDeckId];
+          kanaPracticeFilters = next;
+          changed = true;
+        }
+      }
+    }
+  }
+
   const seedByKey = new Map<string, Card>();
   for (const sc of Object.values(seed.cards)) {
     seedByKey.set(cardSeedKey(sc), sc);
   }
 
+  const seedSentenceTagsByAnswer = new Map<string, string[]>();
+  for (const sc of Object.values(seed.cards)) {
+    if (sc.type !== 'sentence') continue;
+    const ans = (sc.answer ?? '').trim();
+    if (!ans) continue;
+    if (!sc.tags?.length) continue;
+    seedSentenceTagsByAnswer.set(ans, sc.tags);
+  }
+
   for (const [cardId, card] of Object.entries(cards)) {
     const seedCard = seedByKey.get(cardSeedKey(card));
-    if (!seedCard) continue;
+    const fallbackTags = card.type === 'sentence' ? seedSentenceTagsByAnswer.get((card.answer ?? '').trim()) : undefined;
+    if (!seedCard && !fallbackTags) continue;
 
     let nextCard = card;
     let cardChanged = false;
 
-    if (!nextCard.kanji && seedCard.kanji) {
-      nextCard = { ...nextCard, kanji: seedCard.kanji };
-      cardChanged = true;
-    }
-    if (seedCard.pos && (!nextCard.pos || looksLikeBadPos(nextCard.pos, nextCard.kanji))) {
-      nextCard = { ...nextCard, pos: seedCard.pos };
-      cardChanged = true;
-      posRepairs++;
-    }
-    if (!nextCard.note && seedCard.note) {
-      nextCard = { ...nextCard, note: seedCard.note };
-      cardChanged = true;
-    }
-    if (!nextCard.verbBaseKana && seedCard.verbBaseKana) {
-      nextCard = { ...nextCard, verbBaseKana: seedCard.verbBaseKana };
-      cardChanged = true;
-    }
-    if (!nextCard.verbBaseKanji && seedCard.verbBaseKanji) {
-      nextCard = { ...nextCard, verbBaseKanji: seedCard.verbBaseKanji };
-      cardChanged = true;
-    }
-    if (!nextCard.verbForm && seedCard.verbForm) {
-      nextCard = { ...nextCard, verbForm: seedCard.verbForm };
-      cardChanged = true;
-    }
-    if (!nextCard.background && seedCard.background) {
-      nextCard = { ...nextCard, background: seedCard.background };
-      cardChanged = true;
-    }
-    if (seedCard.exampleSentences?.length) {
-      const existingEx = dedupeExamples(normalizeExamples((nextCard as unknown as { exampleSentences?: unknown }).exampleSentences));
-      const seedEx = dedupeExamples(normalizeExamples((seedCard as unknown as { exampleSentences?: unknown }).exampleSentences));
-      const merged = dedupeExamples([...existingEx, ...seedEx]);
+    if (seedCard) {
+      if (!nextCard.kanji && seedCard.kanji) {
+        nextCard = { ...nextCard, kanji: seedCard.kanji };
+        cardChanged = true;
+      }
+      if (seedCard.pos && (!nextCard.pos || looksLikeBadPos(nextCard.pos, nextCard.kanji))) {
+        nextCard = { ...nextCard, pos: seedCard.pos };
+        cardChanged = true;
+        posRepairs++;
+      }
+      if (!nextCard.note && seedCard.note) {
+        nextCard = { ...nextCard, note: seedCard.note };
+        cardChanged = true;
+      }
+      if (!nextCard.verbBaseKana && seedCard.verbBaseKana) {
+        nextCard = { ...nextCard, verbBaseKana: seedCard.verbBaseKana };
+        cardChanged = true;
+      }
+      if (!nextCard.verbBaseKanji && seedCard.verbBaseKanji) {
+        nextCard = { ...nextCard, verbBaseKanji: seedCard.verbBaseKanji };
+        cardChanged = true;
+      }
+      if (!nextCard.verbForm && seedCard.verbForm) {
+        nextCard = { ...nextCard, verbForm: seedCard.verbForm };
+        cardChanged = true;
+      }
+      if (!nextCard.background && seedCard.background) {
+        nextCard = { ...nextCard, background: seedCard.background };
+        cardChanged = true;
+      }
+      if (seedCard.exampleSentences?.length) {
+        const existingEx = dedupeExamples(
+          normalizeExamples((nextCard as unknown as { exampleSentences?: unknown }).exampleSentences),
+        );
+        const seedEx = dedupeExamples(normalizeExamples((seedCard as unknown as { exampleSentences?: unknown }).exampleSentences));
+        const merged = dedupeExamples([...existingEx, ...seedEx]);
 
-      if (merged.length !== existingEx.length) {
-        nextCard = { ...nextCard, exampleSentences: merged.length ? merged : undefined };
+        if (merged.length !== existingEx.length) {
+          nextCard = { ...nextCard, exampleSentences: merged.length ? merged : undefined };
+          cardChanged = true;
+        }
+      }
+    }
+
+    const seedTags = seedCard?.tags ?? fallbackTags;
+    if (seedTags?.length) {
+      const existingTags = Array.isArray(nextCard.tags) ? nextCard.tags : [];
+      const mergedTags = [...new Set([...existingTags, ...seedTags])];
+      if (mergedTags.length !== existingTags.length) {
+        nextCard = { ...nextCard, tags: mergedTags };
         cardChanged = true;
       }
     }
