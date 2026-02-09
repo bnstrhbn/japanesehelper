@@ -1,6 +1,6 @@
 import { toRomaji } from 'wanakana';
 import type { AppState, Card, Deck, ExampleSentence } from './models';
-import { classifyVerb, makeSeedState, verbConjugationHintText } from './seed';
+import { classifyVerb, conjugateVerb, makeSeedState, verbConjugationHintText } from './seed';
 
 const DB_NAME = 'japanese_srs_db';
 const STORE = 'kv';
@@ -295,15 +295,45 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
       const isLegacyRomajiOnly = !!note && note === legacyRomaji;
       const isMissing = !note;
 
-      const shouldUpgrade = isMissing || isLegacyRomajiOnly || !hasNewHint;
+      const baseKana = (nextCard.verbBaseKana ?? '').trim() || (nextCard.answer ?? '').trim();
+      const baseKanji = (nextCard.verbBaseKanji ?? '').trim() || undefined;
+      const cls = baseKana ? classifyVerb(baseKana, baseKanji) : 'godan';
 
-      if (shouldUpgrade) {
-        const baseKana = (nextCard.verbBaseKana ?? '').trim() || (nextCard.answer ?? '').trim();
-        const baseKanji = (nextCard.verbBaseKanji ?? '').trim() || undefined;
-        const cls = classifyVerb(baseKana, baseKanji);
+      const expectedKana = baseKana ? conjugateVerb(baseKana, baseKana, form as any, cls as any) : nextCard.answer;
+      const expectedKanji = baseKanji ? conjugateVerb(baseKanji, baseKana, form as any, cls as any) : undefined;
+
+      const answerChanged = !!expectedKana && (nextCard.answer ?? '').trim() !== expectedKana.trim();
+      const kanjiChanged =
+        typeof expectedKanji === 'string' && expectedKanji.trim()
+          ? (nextCard.kanji ?? '').trim() !== expectedKanji.trim()
+          : false;
+
+      if (answerChanged || kanjiChanged) {
+        const bg = (nextCard.background ?? '').trim();
+        const fromDisp = baseKanji || baseKana;
+        const toDisp = expectedKanji || expectedKana;
+        const nextBg = bg.includes('Conjugation:')
+          ? bg.replace(/(Conjugation:\s*[^\n]*?→\s*)([^\(\n]+)(\s*\()/, `$1${toDisp}$3`)
+          : bg;
+
         nextCard = {
           ...nextCard,
-          note: verbConjugationHintText(form as any, baseKana, cls, nextCard.answer),
+          answer: expectedKana,
+          kanji: expectedKanji ?? nextCard.kanji,
+          background: nextBg,
+        };
+        cardChanged = true;
+      }
+
+      const shouldUpgrade = isMissing || isLegacyRomajiOnly || !hasNewHint || answerChanged || kanjiChanged;
+
+      if (shouldUpgrade) {
+        const baseKana2 = (nextCard.verbBaseKana ?? '').trim() || (nextCard.answer ?? '').trim();
+        const baseKanji2 = (nextCard.verbBaseKanji ?? '').trim() || undefined;
+        const cls2 = classifyVerb(baseKana2, baseKanji2);
+        nextCard = {
+          ...nextCard,
+          note: verbConjugationHintText(form as any, baseKana2, cls2, nextCard.answer),
         };
         cardChanged = true;
         verbHintRepairs++;
