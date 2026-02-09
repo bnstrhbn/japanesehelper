@@ -71,9 +71,17 @@ const classifyVerb = (baseKana: string, baseKanji?: string): VerbClass => {
   const kana = baseKana.trim();
   if (kana === 'ある') return 'godan';
   if (kana === 'いく') return 'godan';
-  if (baseKanji && baseKanji.trim() === '要る') return 'godan';
 
-  const ruExceptions = new Set(['はいる', 'かえる', 'しる']);
+  const k = (baseKanji ?? '').trim();
+  if (k === '要る') return 'godan';
+
+  const ichidanKanji = new Set(['変える', '着る']);
+  if (ichidanKanji.has(k)) return 'ichidan';
+
+  const godanRuKanji = new Set(['入る', '帰る', '知る', '切る', '走る', '乗る', '減る', '滑る', '参る', '限る', '握る']);
+  if (godanRuKanji.has(k)) return 'godan';
+
+  const ruExceptions = new Set(['はいる', 'かえる', 'しる', 'のる', 'はしる', 'きる', 'へる', 'すべる', 'しゃべる', 'まいる', 'かぎる', 'にぎる']);
   if (ruExceptions.has(kana)) return 'godan';
 
   if (kana.endsWith('る')) {
@@ -305,9 +313,19 @@ export default function App() {
           if (!verbConjDeckId) return { ...prev, wkLastVerbSyncAt: syncedAt };
 
           const existingKeys = new Set<string>();
+          const existingVerbKeys = new Set<string>();
           for (const c of Object.values(prev.cards)) {
             const k = `${c.deckId}||${c.type}||${normalizeEnglish(c.prompt)}||${normalizeJapanese(c.answer)}||${(c.kanji ?? '').trim()}`;
             existingKeys.add(k);
+
+            if (c.deckId === verbConjDeckId && c.type === 'verb') {
+              const bk = (c.verbBaseKanji ?? '').trim();
+              const ba = normalizeJapanese(c.verbBaseKana ?? '');
+              const f = (c.verbForm ?? '').trim().toLowerCase();
+              const p = normalizeEnglish(c.prompt ?? '');
+              const key2 = bk ? `verb||${ba}||${bk}||${f}` : `verb||${ba}||${f}||${p}`;
+              if (ba && f) existingVerbKeys.add(key2);
+            }
           }
 
           const nextCards: Record<string, Card> = { ...prev.cards };
@@ -381,8 +399,14 @@ export default function App() {
               };
 
               const key = `${verbCard.deckId}||${verbCard.type}||${normalizeEnglish(verbCard.prompt)}||${normalizeJapanese(verbCard.answer)}||${(verbCard.kanji ?? '').trim()}`;
-              if (existingKeys.has(key)) continue;
+              const bk = (verbCard.verbBaseKanji ?? '').trim();
+              const ba = normalizeJapanese(verbCard.verbBaseKana ?? '');
+              const f = (verbCard.verbForm ?? '').trim().toLowerCase();
+              const p = normalizeEnglish(verbCard.prompt ?? '');
+              const key2 = bk ? `verb||${ba}||${bk}||${f}` : `verb||${ba}||${f}||${p}`;
+              if (existingKeys.has(key) || existingVerbKeys.has(key2)) continue;
               existingKeys.add(key);
+              existingVerbKeys.add(key2);
               nextCards[verbCard.id] = verbCard;
               cardIds.push(verbCard.id);
               addedConj += 1;
@@ -2508,9 +2532,19 @@ function ManageScreen(props: {
       const verbConjDeckId = verbConjDeck?.id;
 
       const existingKeys = new Set<string>();
+      const existingVerbKeys = new Set<string>();
       for (const c of Object.values(state.cards)) {
         const k = `${c.deckId}||${c.type}||${normalizeEnglish(c.prompt)}||${normalizeJapanese(c.answer)}||${(c.kanji ?? '').trim()}`;
         existingKeys.add(k);
+
+        if (verbConjDeckId && c.deckId === verbConjDeckId && c.type === 'verb') {
+          const bk = (c.verbBaseKanji ?? '').trim();
+          const ba = normalizeJapanese(c.verbBaseKana ?? '');
+          const f = (c.verbForm ?? '').trim().toLowerCase();
+          const p = normalizeEnglish(c.prompt ?? '');
+          const key2 = bk ? `verb||${ba}||${bk}||${f}` : `verb||${ba}||${f}||${p}`;
+          if (ba && f) existingVerbKeys.add(key2);
+        }
       }
 
       const nextCards: Record<string, Card> = { ...state.cards };
@@ -2633,8 +2667,14 @@ function ManageScreen(props: {
             };
 
             const verbKey = `${verbCard.deckId}||${verbCard.type}||${normalizeEnglish(verbCard.prompt)}||${normalizeJapanese(verbCard.answer)}||${(verbCard.kanji ?? '').trim()}`;
-            if (existingKeys.has(verbKey)) continue;
+            const bk = (verbCard.verbBaseKanji ?? '').trim();
+            const ba = normalizeJapanese(verbCard.verbBaseKana ?? '');
+            const f = (verbCard.verbForm ?? '').trim().toLowerCase();
+            const p = normalizeEnglish(verbCard.prompt ?? '');
+            const key2 = bk ? `verb||${ba}||${bk}||${f}` : `verb||${ba}||${f}||${p}`;
+            if (existingKeys.has(verbKey) || existingVerbKeys.has(key2)) continue;
             existingKeys.add(verbKey);
+            existingVerbKeys.add(key2);
             nextCards[verbCard.id] = verbCard;
             nextDecks[verbConjDeckId] = {
               ...nextDecks[verbConjDeckId],

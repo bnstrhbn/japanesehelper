@@ -131,6 +131,7 @@ const idbSet = async <T>(key: string, value: T): Promise<void> => {
 
 const inferDirectionFromDeckName = (name: string): 'en-ja' | 'ja-en' => {
   const n = name.toLowerCase();
+  if (n.includes('katakana')) return 'ja-en';
   if (n.includes('jp→en') || n.includes('jp->en') || n.includes('ja→en') || n.includes('ja->en')) return 'ja-en';
   return 'en-ja';
 };
@@ -607,8 +608,48 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
         keepKeys.add(cardSeedKey(sc));
       }
 
-      const deck = decks[katakanaDeckId];
+      let deck = decks[katakanaDeckId];
       if (deck) {
+        const looksLikeKatakana = (s: string): boolean => /[ァ-ヴー]/.test((s ?? '').trim());
+        const looksLikeEnglish = (s: string): boolean => /[a-zA-Z]/.test((s ?? '').trim());
+
+        if (deck.direction !== 'ja-en' || (seedKataDeck.description && deck.description !== seedKataDeck.description)) {
+          deck = {
+            ...deck,
+            direction: 'ja-en',
+            description: seedKataDeck.description,
+          };
+          decks = {
+            ...decks,
+            [katakanaDeckId]: deck,
+          };
+          changed = true;
+        }
+
+        let nextCards: typeof cards | null = null;
+        for (const id of deck.cardIds) {
+          const c = cards[id];
+          if (!c || c.deckId !== katakanaDeckId) continue;
+
+          const prompt = (c.prompt ?? '').trim();
+          const answer = (c.answer ?? '').trim();
+
+          const isLegacy = looksLikeEnglish(prompt) && looksLikeKatakana(answer);
+          if (!isLegacy) continue;
+
+          if (!nextCards) nextCards = { ...cards };
+          nextCards[id] = {
+            ...c,
+            prompt: answer,
+            answer: prompt,
+          };
+        }
+
+        if (nextCards) {
+          cards = nextCards;
+          changed = true;
+        }
+
         const removed: string[] = [];
         const kept = deck.cardIds.filter((id) => {
           const c = cards[id];
@@ -814,6 +855,123 @@ const migrateState = (state: AppState): { next: AppState; changed: boolean } => 
     console.info(
       `Removed ${removedBadVerbCards.length} invalid card(s) from Verb Conjugation deck (legacy/non-generated cleanup).`,
     );
+  }
+
+  {
+    const hasProgress = (id: string): boolean => {
+      if (srs[id]) return true;
+      const st = stats?.[id];
+      return !!st && (st.reviews ?? 0) > 0;
+    };
+
+    const isWkVerbCard = (c: Card | undefined): boolean => {
+      if (!c) return false;
+      const bg = (c.background ?? '').toLowerCase();
+      return bg.includes('source: wanikani') || bg.includes('source: wani kani');
+    };
+
+    const exampleCount = (c: Card | undefined): number => {
+      const ex = (c as unknown as { exampleSentences?: unknown }).exampleSentences;
+      return normalizeExamples(ex).length;
+    };
+
+    const removedDupVerbCards: string[] = [];
+    for (const [deckId, deck] of Object.entries(decks)) {
+      const name = (deck.name ?? '').toLowerCase();
+      if (!name.includes('verb conjugation')) continue;
+
+      const buckets = new Map<string, string[]>();
+      for (const cardId of deck.cardIds) {
+        const c = cards[cardId];
+        if (!c || c.type !== 'verb') continue;
+        const baseKana = (c.verbBaseKana ?? '').trim();
+        const form = (c.verbForm ?? '').trim().toLowerCase();
+        const ans = (c.answer ?? '').trim();
+        if (!baseKana || !form || !ans) continue;
+        const baseKanji = (c.verbBaseKanji ?? '').trim();
+
+        const key = baseKanji ? `${baseKana}||${baseKanji}||${form}||${ans}` : `${baseKana}||||${form}||${ans}`;
+        const arr = buckets.get(key);
+        if (arr) arr.push(cardId);
+        else buckets.set(key, [cardId]);
+      }
+
+      const keepSet = new Set(deck.cardIds);
+      for (const ids of buckets.values()) {
+        if (ids.length < 2) continue;
+
+        let keepId = ids[0];
+        for (const cand of ids.slice(1)) {
+          const a = cards[keepId];
+          const b = cards[cand];
+          if (!a || !b) continue;
+
+          const ap = hasProgress(keepId);
+          const bp = hasProgress(cand);
+          if (ap !== bp) {
+            if (bp) keepId = cand;
+            continue;
+          }
+
+          const aw = isWkVerbCard(a);
+          const bw = isWkVerbCard(b);
+          if (aw !== bw) {
+            if (bw) keepId = cand;
+            continue;
+          }
+
+          const ak = !!(a.kanji ?? '').trim();
+          const bk = !!(b.kanji ?? '').trim();
+          if (ak !== bk) {
+            if (bk) keepId = cand;
+            continue;
+          }
+
+          const ae = exampleCount(a);
+          const be = exampleCount(b);
+          if (ae !== be) {
+            if (be > ae) keepId = cand;
+            continue;
+          }
+        }
+
+        for (const id of ids) {
+          if (id === keepId) continue;
+          if (!keepSet.has(id)) continue;
+          keepSet.delete(id);
+          removedDupVerbCards.push(id);
+        }
+      }
+
+      if (keepSet.size !== deck.cardIds.length) {
+        decks = {
+          ...decks,
+          [deckId]: {
+            ...deck,
+            cardIds: deck.cardIds.filter((id) => keepSet.has(id)),
+          },
+        };
+        changed = true;
+      }
+    }
+
+    if (removedDupVerbCards.length) {
+      const nextCards = { ...cards };
+      const nextSrs = { ...srs };
+      const nextStats = { ...(stats ?? {}) };
+
+      for (const id of removedDupVerbCards) {
+        delete nextCards[id];
+        delete nextSrs[id];
+        delete nextStats[id];
+      }
+
+      cards = nextCards;
+      srs = nextSrs;
+      stats = nextStats;
+      changed = true;
+      console.info(`Removed ${removedDupVerbCards.length} duplicate Verb Conjugation card(s) (seed/WK dedupe).`);
+    }
   }
 
   if (posRepairs > 0) {

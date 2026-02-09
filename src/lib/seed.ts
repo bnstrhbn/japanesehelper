@@ -297,9 +297,17 @@ export const classifyVerb = (baseKana: string, baseKanji?: string): VerbClass =>
   const kana = baseKana.trim();
   if (kana === 'ある') return 'godan';
   if (kana === 'いく') return 'godan';
-  if (baseKanji && baseKanji.trim() === '要る') return 'godan';
 
-  const ruExceptions = new Set(['はいる', 'かえる', 'しる']);
+  const k = (baseKanji ?? '').trim();
+  if (k === '要る') return 'godan';
+
+  const ichidanKanji = new Set(['変える', '着る']);
+  if (ichidanKanji.has(k)) return 'ichidan';
+
+  const godanRuKanji = new Set(['入る', '帰る', '知る', '切る', '走る', '乗る', '減る', '滑る', '参る', '限る', '握る']);
+  if (godanRuKanji.has(k)) return 'godan';
+
+  const ruExceptions = new Set(['はいる', 'かえる', 'しる', 'のる', 'はしる', 'きる', 'へる', 'すべる', 'しゃべる', 'まいる', 'かぎる', 'にぎる']);
   if (ruExceptions.has(kana)) return 'godan';
 
   if (kana.endsWith('る')) {
@@ -477,7 +485,7 @@ export const makeSeedState = (): AppState => {
   const phrasesSentences = makeDeck('Phrases & Sentences', 'English → Japanese (kana) — phrases + sentence writing', 'en-ja');
   const sentences = phrasesSentences;
   const phrases = phrasesSentences;
-  const katakana = makeDeck('Katakana', 'English → Katakana (common words)', 'en-ja');
+  const katakana = makeDeck('Katakana', 'Katakana → English (type meaning)', 'ja-en');
 
   const decks: AppState['decks'] = {
     [vocab.id]: vocab,
@@ -528,7 +536,7 @@ export const makeSeedState = (): AppState => {
   ];
 
   for (const [english, kata] of katakanaWords) {
-    add(makeCard(katakana.id, 'vocab', english, kata, toRomaji(kata), undefined, undefined, undefined, 'katakana word'));
+    add(makeCard(katakana.id, 'vocab', kata, english, toRomaji(kata), undefined, undefined, undefined, 'katakana word'));
   }
 
   add(
@@ -1323,8 +1331,209 @@ export const makeSeedState = (): AppState => {
   add(makeCard(vocab.id, 'vocab', 'ski patrol', 'すきーぱとろーる', 'sukii patorooru', undefined, [{ ja: 'すきーぱとろーるをよんでください。' }], 'スキーパトロール', 'noun'));
 
   add(makeCard(vocab.id, 'vocab', 'to go', 'いく', 'iku', undefined, [{ ja: 'みせにいく。' }, { ja: 'いまいく。' }, { ja: 'あしたいく。' }], '行く', 'verb (intransitive)'));
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to come (来る) (often uses に/へ)',
+      'くる',
+      'kuru',
+      'Irregular verb. Common patterns: [place] にくる / [place] へくる.',
+      [{ ja: 'いまくる。' }, { ja: 'ともだちがくる。' }, { ja: 'あしたここにくる。' }],
+      '来る',
+      'verb (irregular)',
+    ),
+  );
   add(makeCard(vocab.id, 'vocab', 'to return; to go home', 'かえる', 'kaeru', undefined, [{ ja: 'いえにかえる。' }, { ja: 'よるにいえにかえる。' }], '帰る', 'verb (intransitive)'));
   add(makeCard(vocab.id, 'vocab', 'to understand; to know', 'わかる', 'wakaru', undefined, [{ ja: 'にほんごがわかる。' }, { ja: 'にほんごがわかりません。' }], '分かる', 'verb (intransitive)'));
+
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to say; to tell; to call (something) (言う) (often uses と)',
+      'いう',
+      'iu',
+      'Common patterns: [quote] と いう; [name] と いう (“be called ...”).',
+      [{ ja: 'なまえをいう。' }, { ja: 'それはにほんごでなんていう？' }, { ja: 'ほんとうだという。' }],
+      '言う',
+      'verb (transitive)',
+    ),
+  );
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to think; to feel; to believe (思う) (often uses と)',
+      'おもう',
+      'omou',
+      'Common pattern: [clause] と おもう (“I think ...”).',
+      [{ ja: 'そうおもう。' }, { ja: 'いいとおもう。' }, { ja: 'あしたいくとおもう。' }],
+      '思う',
+      'verb (transitive)',
+    ),
+  );
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to wait (待つ) (uses を)',
+      'まつ',
+      'matsu',
+      undefined,
+      [{ ja: 'ここでまつ。' }, { ja: 'バスをまつ。' }, { ja: 'ちょっとまって。' }],
+      '待つ',
+      'verb (transitive)',
+    ),
+  );
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to meet; to see (a person) (会う) (often uses に)',
+      'あう',
+      'au',
+      'Common pattern: [person] に あう (meet/see a person).',
+      [{ ja: 'ともだちにあう。' }, { ja: 'えきであう。' }, { ja: 'またあう。' }],
+      '会う',
+      'verb (intransitive)',
+    ),
+  );
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to make; to create (作る) (uses を)',
+      'つくる',
+      'tsukuru',
+      undefined,
+      [{ ja: 'ごはんをつくる。' }, { ja: 'これをつくる。' }, { ja: 'あたらしいアプリをつくる。' }],
+      '作る',
+      'verb (transitive)',
+    ),
+  );
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to teach; to tell (教える) (uses を / に)',
+      'おしえる',
+      'oshieru',
+      'Common patterns: [thing] を [person] に おしえる; [person] に おしえてください.',
+      [{ ja: 'にほんごをおしえる。' }, { ja: 'わたしにおしえてください。' }, { ja: 'ともだちにおしえる。' }],
+      '教える',
+      'verb (transitive)',
+    ),
+  );
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to remember; to memorize; to learn (覚える) (uses を)',
+      'おぼえる',
+      'oboeru',
+      undefined,
+      [{ ja: 'かんじをおぼえる。' }, { ja: 'なまえをおぼえる。' }, { ja: 'あたらしいことをおぼえる。' }],
+      '覚える',
+      'verb (transitive)',
+    ),
+  );
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to forget (忘れる) (uses を)',
+      'わすれる',
+      'wasureru',
+      undefined,
+      [{ ja: 'なまえをわすれる。' }, { ja: 'しゅくだいをわすれる。' }, { ja: 'わすれないで。' }],
+      '忘れる',
+      'verb (transitive)',
+    ),
+  );
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to give (to someone); to give as a gift (often uses に)',
+      'あげる',
+      'ageru',
+      'Common pattern: [person] に [thing] を あげる.',
+      [{ ja: 'ともだちにぷれぜんとをあげる。' }, { ja: 'ねこにえさをあげる。' }, { ja: 'これをあげる。' }],
+      undefined,
+      'verb (transitive)',
+    ),
+  );
+
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to receive; to get (from someone) (often uses から/に)',
+      'もらう',
+      'morau',
+      'Common patterns: [person] から [thing] を もらう; [person] に [thing] を もらう.',
+      [{ ja: 'ともだちからぷれぜんとをもらう。' }, { ja: 'せんせいにもらった。' }, { ja: 'これをもらう。' }],
+      '貰う',
+      'verb (transitive)',
+    ),
+  );
+
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to give (to me/us); to do (a favor) (often uses に)',
+      'くれる',
+      'kureru',
+      'Common patterns: [person] が [thing] を くれる; [person] が [action-te] くれる.',
+      [{ ja: 'ともだちがこれをくれる。' }, { ja: 'せんせいがほんをくれた。' }, { ja: 'てつだってくれる？' }],
+      undefined,
+      'verb (transitive)',
+    ),
+  );
+
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to ride; to board (a vehicle) (乗る) (often uses に)',
+      'のる',
+      'noru',
+      'Common patterns: [vehicle] に のる; [place] で のる (board at...).',
+      [{ ja: 'バスにのる。' }, { ja: 'でんしゃにのる。' }, { ja: 'えきでのる。' }],
+      '乗る',
+      'verb (intransitive)',
+    ),
+  );
+
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to get off; to descend (降りる) (often uses から)',
+      'おりる',
+      'oriru',
+      'Common pattern: [vehicle] から おりる (get off...).',
+      [{ ja: 'バスからおりる。' }, { ja: 'つぎのえきでおりる。' }, { ja: 'ここでおりてください。' }],
+      '降りる',
+      'verb (intransitive)',
+    ),
+  );
+
+  add(
+    makeCard(
+      vocab.id,
+      'vocab',
+      'to get tired; to be tired (疲れる)',
+      'つかれる',
+      'tsukareru',
+      undefined,
+      [{ ja: 'きょうはつかれた。' }, { ja: 'ちょっとつかれる。' }, { ja: 'つかれたからねる。' }],
+      '疲れる',
+      'verb (intransitive)',
+    ),
+  );
 
   add(makeCard(vocab.id, 'vocab', 'because; since (casual)', 'から', 'kara', undefined, [{ ja: 'あめだから、いえにいる。' }, { ja: 'じかんがないから、いかない。' }], undefined, 'particle / conjunction'));
   add(makeCard(vocab.id, 'vocab', 'if (suppose)', 'もし', 'moshi', undefined, [{ ja: 'もしひまなら、いきます。' }], undefined, 'adverb'));
@@ -1710,6 +1919,102 @@ export const makeSeedState = (): AppState => {
       undefined,
       '時間があるなら明日行く',
     ),
+  );
+
+  add(
+    {
+      ...makeCard(
+        sentences.id,
+        'sentence',
+        'I will give my friend a present.',
+        'ともだちにぷれぜんとをあげる',
+        'tomodachi ni purezento o ageru',
+        'ともだち = friend\nに = to (receiver)\nぷれぜんと = present (loanword)\nを = object particle\nあげる = to give (giver’s perspective)\n\nStructure: [giver] が [receiver] に [object] を あげる\n(Note: わたしが is often omitted.)',
+        undefined,
+        '友達にプレゼントをあげる',
+      ),
+      tags: ['shopping', 'advanced'],
+    },
+  );
+
+  add(
+    {
+      ...makeCard(
+        sentences.id,
+        'sentence',
+        'My friend will give me beer.',
+        'ともだちがわたしにびーるをくれる',
+        'tomodachi ga watashi ni biiru o kureru',
+        'ともだち = friend\nが = subject particle\nわたし = me\nに = to (receiver)\nびーる = beer\nを = object particle\nくれる = to give (to me/us)\n\nStructure: [giver] が [receiver] に [object] を くれる\n(Note: わたしに is often omitted if it’s clear.)',
+        undefined,
+        '友達が私にビールをくれる',
+      ),
+      tags: ['restaurant', 'advanced'],
+    },
+  );
+
+  add(
+    {
+      ...makeCard(
+        sentences.id,
+        'sentence',
+        'I will receive a lift ticket from my friend.',
+        'ともだちからりふとのちけっとをもらう',
+        'tomodachi kara rifuto no chiketto o morau',
+        'ともだち = friend\nから = from (source)\nりふと = lift\nの = possessive\nちけっと = ticket\nを = object particle\nもらう = to receive/get\n\nStructure: [receiver] が [giver] から [object] を もらう\n(You can also use に when the giver is a direct contact.)',
+        undefined,
+        '友達からリフトのチケットをもらう',
+      ),
+      tags: ['skiing', 'advanced'],
+    },
+  );
+
+  add(
+    {
+      ...makeCard(
+        sentences.id,
+        'sentence',
+        'My friend will tell me the recommendation.',
+        'ともだちがわたしにおすすめをおしえてくれる',
+        'tomodachi ga watashi ni osusume o oshiete kureru',
+        'ともだち = friend\nが = subject particle\nわたし = me\nに = to (receiver)\nおすすめ = recommendation\nを = object particle\nおしえて = te-form of おしえる (teach/tell)\nくれる = do (a favor) for me\n\nStructure: [giver] が [receiver] に [thing] を [verb-te] くれる',
+        undefined,
+        '友達が私におすすめを教えてくれる',
+      ),
+      tags: ['restaurant', 'advanced'],
+    },
+  );
+
+  add(
+    {
+      ...makeCard(
+        sentences.id,
+        'sentence',
+        'I will have my friend wait a little (for me).',
+        'ともだちにちょっとまってもらう',
+        'tomodachi ni chotto matte morau',
+        'ともだち = friend\nに = from (giver of the favor)\nちょっと = a little\nまって = te-form of まつ (wait)\nもらう = to receive (a favor)\n\nStructure: [receiver] が [giver] に [verb-te] もらう\nNuance: often used when you asked/requested the favor.',
+        undefined,
+        '友達にちょっと待ってもらう',
+      ),
+      tags: ['skiing', 'advanced'],
+    },
+  );
+
+  add(
+    {
+      ...makeCard(
+        sentences.id,
+        'sentence',
+        'I will help my friend (as a favor).',
+        'ともだちをたすけてあげる',
+        'tomodachi o tasukete ageru',
+        'ともだち = friend\nを = object particle\nたすけて = te-form of たすける (help)\nあげる = do (a favor) for someone else\n\nStructure: [receiver] を [verb-te] あげる\n(Note: can sound pushy if said directly to the recipient.)',
+        undefined,
+        '友達を助けてあげる',
+      ),
+      tags: ['skiing', 'advanced'],
+    },
   );
 
   add(
