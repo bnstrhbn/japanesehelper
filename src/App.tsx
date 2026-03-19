@@ -835,6 +835,7 @@ export default function App() {
               {isPhrasesAndSentences ? (
                 <div className="row" style={{ marginTop: 8, gap: 8, flexWrap: 'wrap' }}>
                   <button onClick={() => startPracticeByTags(d.id, ['greeting'])}>Greeting</button>
+                  <button onClick={() => startPracticeByTags(d.id, ['common_sayings'])}>Common Sayings</button>
                   <button onClick={() => startPracticeByTags(d.id, ['restaurant'])}>Restaurants</button>
                   <button onClick={() => startPracticeByTags(d.id, ['shopping'])}>Shopping</button>
                   <button onClick={() => startPracticeByTags(d.id, ['skiing'])}>Skiing</button>
