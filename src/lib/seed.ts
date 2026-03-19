@@ -820,6 +820,349 @@ export const makeSeedState = (): AppState => {
     },
   );
 
+  // Common Sayings (tag: common_sayings)
+  add(
+    {
+      ...makeCard(
+        phrases.id,
+        'sentence',
+        'Let’s eat. (said before eating)',
+        'いただきます',
+        'itadakimasu',
+        `Set phrase said before starting a meal.
+- Literally: “I humbly receive.”
+- Not a prayer, but it can feel similar socially.
+- Often used even when eating alone.
+
+✅ Best for: meals at home, restaurants, school/work lunches.
+❌ Avoid: using as “thanks” after eating (use ごちそうさまでした).`, 
+        undefined,
+        '頂きます',
+        'expression',
+      ),
+      tags: ['common_sayings'],
+    },
+  );
+  add(
+    {
+      ...makeCard(
+        phrases.id,
+        'sentence',
+        'Thank you for the meal. (said after eating)',
+        'ごちそうさまでした',
+        'gochisousama deshita',
+        `Set phrase said after finishing a meal.
+- Used to thank whoever cooked/hosted (and sometimes the restaurant).
+- Casual variants: ごちそうさま / ごちそうさまでした〜.
+
+✅ Best for: after meals, leaving a restaurant, thanking a host.
+❌ Avoid: saying it before eating (use いただきます).`, 
+        undefined,
+        'ご馳走様でした',
+        'expression',
+      ),
+      tags: ['common_sayings'],
+    },
+  );
+  add(
+    {
+      ...makeCard(
+        phrases.id,
+        'sentence',
+        'Thanks for your hard work. (during the day / to coworkers)',
+        'おつかれさまです',
+        'otsukaresama desu',
+        `Very common workplace/group phrase.
+- Literally: “You must be tired,” but used as appreciation/acknowledgement.
+- Used as: greeting, “thanks,” “good job,” or “see you.”
+- Abbrev: おつかれ / おつかれさま.
+
+✅ Best for: coworkers, teammates, classmates.
+❌ Avoid: using to someone much higher rank in very formal settings (use more formal set phrases if needed).`, 
+        undefined,
+        'お疲れ様です',
+        'expression',
+      ),
+      tags: ['common_sayings'],
+    },
+  );
+  add(
+    {
+      ...makeCard(
+        phrases.id,
+        'sentence',
+        'Thanks for your hard work. (after finishing / end of day)',
+        'おつかれさまでした',
+        'otsukaresama deshita',
+        `Past form used when something is finished (wrapping up / end of shift).
+- Often said when leaving the office.
+- Abbrev: おつかれでした (less common) / おつかれ〜 (casual).
+
+✅ Best for: end of day, after completing a task/project.
+❌ Avoid: as a “hello” at the start of the day (use おつかれさまです).`, 
+        undefined,
+        'お疲れ様でした',
+        'expression',
+      ),
+      tags: ['common_sayings'],
+    },
+  );
+  add(
+    {
+      ...makeCard(
+        phrases.id,
+        'sentence',
+        'Thank you very much. (polite, past)',
+        'ありがとうございました',
+        'arigatou gozaimashita',
+        `Polite “thank you” in the past tense.
+- Used when the favor/service is completed.
+- Common after receiving help, finishing a purchase, or ending an interaction.
+- Abbrev (casual/slang): どうも / あざっす (very informal).
+
+✅ Best for: shops, service interactions, after someone helped you.
+❌ Avoid: あざっす in formal situations.`, 
+        undefined,
+        undefined,
+        'expression',
+      ),
+      tags: ['common_sayings'],
+    },
+  );
+  add(
+    {
+      ...makeCard(
+        phrases.id,
+        'sentence',
+        'Excuse me (I’m about to do something) / Sorry to interrupt.',
+        'しつれいします',
+        'shitsurei shimasu',
+        `Literally “I will be rude,” used as a polite softener.
+- Entering/leaving a room, interrupting, hanging up the phone, etc.
+- Abbrev: しつれい / しつれいしますね.
+
+✅ Best for: offices, classrooms, formal interactions.
+❌ Avoid: using with close friends unless jokingly formal.`, 
+        undefined,
+        '失礼します',
+        'expression',
+      ),
+      tags: ['common_sayings'],
+    },
+  );
+  add(
+    {
+      ...makeCard(
+        phrases.id,
+        'sentence',
+        'Excuse me for intruding. (entering someone’s home/room)',
+        'おじゃまします',
+        'ojamashimasu',
+        `Set phrase when entering someone’s home/space.
+- Literal: “I will disturb you,” but it’s a polite greeting.
+- Leaving: おじゃましました.
+- Casual: おじゃましまーす.
+
+✅ Best for: visiting someone’s home, entering a private space.
+❌ Avoid: using in restaurants/shops (use しつれいします or すみません).`, 
+        undefined,
+        'お邪魔します',
+        'expression',
+      ),
+      tags: ['common_sayings'],
+    },
+  );
+  add(
+    {
+      ...makeCard(
+        phrases.id,
+        'sentence',
+        'I’m leaving now. (said when leaving home)',
+        'いってきます',
+        'ittekimasu',
+        `Said when leaving home (and expecting to return).
+- Often paired with response: いってらっしゃい.
+- Casual: いってくる.
+
+✅ Best for: leaving home, leaving a shared place.
+❌ Avoid: if you’re not coming back (context matters).`, 
+        undefined,
+        '行ってきます',
+        'expression',
+      ),
+      tags: ['common_sayings'],
+    },
+  );
+  add(
+    {
+      ...makeCard(
+        phrases.id,
+        'sentence',
+        'Take care / See you. (said to someone leaving home)',
+        'いってらっしゃい',
+        'itterasshai',
+        `Response to いってきます.
+- Meaning: “Go and come back (safely).”
+- Casual: いってら〜.
+
+✅ Best for: family/roommates, hosts seeing someone off.
+❌ Avoid: in very formal business settings.`, 
+        undefined,
+        '行ってらっしゃい',
+        'expression',
+      ),
+      tags: ['common_sayings'],
+    },
+  );
+  add(
+    {
+      ...makeCard(
+        phrases.id,
+        'sentence',
+        'I’m home. (said when returning home)',
+        'ただいま',
+        'tadaima',
+        `Said when returning home (or back to a familiar place).
+- Response: おかえり / おかえりなさい.
+- Casual: ただいまー.
+
+✅ Best for: coming home, returning to the office/team room.
+❌ Avoid: using as a generic greeting to strangers.`, 
+        undefined,
+        'ただ今',
+        'expression',
+      ),
+      tags: ['common_sayings'],
+    },
+  );
+  add(
+    {
+      ...makeCard(
+        phrases.id,
+        'sentence',
+        'Welcome back. (polite; said to someone returning home)',
+        'おかえりなさい',
+        'okaerinasai',
+        `Response to ただいま.
+- Casual: おかえり.
+- Very polite: おかえりなさいませ.
+
+✅ Best for: home, hosts welcoming someone back.
+❌ Avoid: おかえりなさいませ unless you’re roleplaying “shop staff” (it can sound extra).`, 
+        undefined,
+        'お帰りなさい',
+        'expression',
+      ),
+      tags: ['common_sayings'],
+    },
+  );
+  add(
+    {
+      ...makeCard(
+        phrases.id,
+        'sentence',
+        'Get well soon. / Take care. (to someone sick)',
+        'おだいじに',
+        'odaiji ni',
+        `Kind phrase to someone who’s sick/injured.
+- Often used by doctors/pharmacists.
+- Full: お大事にしてください.
+
+✅ Best for: illness, injury, leaving a clinic.
+❌ Avoid: using when someone is just busy/tired (use おつかれさま).`, 
+        undefined,
+        'お大事に',
+        'expression',
+      ),
+      tags: ['common_sayings'],
+    },
+  );
+  add(
+    {
+      ...makeCard(
+        phrases.id,
+        'sentence',
+        'Sorry to keep you waiting.',
+        'おまたせしました',
+        'omatase shimashita',
+        `Polite apology when you made someone wait.
+- More formal: お待たせいたしました.
+- Casual: おまたせ〜.
+
+✅ Best for: meeting someone late, customer service.
+❌ Avoid: using to superiors in very formal contexts—use お待たせいたしました.`, 
+        undefined,
+        'お待たせしました',
+        'expression',
+      ),
+      tags: ['common_sayings'],
+    },
+  );
+  add(
+    {
+      ...makeCard(
+        phrases.id,
+        'sentence',
+        'I’m terribly sorry. (very formal apology)',
+        'もうしわけありません',
+        'moushiwake arimasen',
+        `Very formal apology (“There is no excuse”).
+- Stronger/more polite than ごめんなさい.
+- Even more formal: 申し訳ございません.
+
+✅ Best for: business, customer service, serious mistakes.
+❌ Avoid: with close friends (sounds stiff); use ごめん / ごめんなさい.`, 
+        undefined,
+        '申し訳ありません',
+        'expression',
+      ),
+      tags: ['common_sayings'],
+    },
+  );
+  add(
+    {
+      ...makeCard(
+        phrases.id,
+        'sentence',
+        'Thank you for your continued support. (business email opener)',
+        'おせわになっております',
+        'osewa ni natte orimasu',
+        `Very common business set phrase.
+- Used in emails/phone calls to clients/partners.
+- Variation: いつもお世話になっております.
+- Abbrev: お世話になります (common too).
+
+✅ Best for: work emails, vendor/client relationships.
+❌ Avoid: casual friend messages (too formal).`, 
+        undefined,
+        'お世話になっております',
+        'expression',
+      ),
+      tags: ['common_sayings'],
+    },
+  );
+  add(
+    {
+      ...makeCard(
+        phrases.id,
+        'sentence',
+        'Congratulations! (polite)',
+        'おめでとうございます',
+        'omedetou gozaimasu',
+        `Polite congratulations.
+- Casual: おめでとう.
+- Often used for birthdays, weddings, new jobs, passing exams.
+
+✅ Best for: celebrations, formal-ish congratulations.
+❌ Avoid: using the casual おめでとう in very formal settings if you need politeness.`, 
+        undefined,
+        'おめでとうございます',
+        'expression',
+      ),
+      tags: ['common_sayings'],
+    },
+  );
+
   add(
     {
       ...makeCard(
