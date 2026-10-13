@@ -22,6 +22,7 @@ import {
 import { applySm2, defaultSrs } from './lib/srs';
 import { loadState, resetState, saveState } from './lib/storage';
 import { conjugateVerb as seedConjugateVerb, verbConjugationHintText, verbFormLabel as seedVerbFormLabel } from './lib/seed';
+import { WkApp } from './wk/WkApp';
 
 type Screen =
   | { name: 'home' }
@@ -30,7 +31,8 @@ type Screen =
   | { name: 'verb_browser'; deckId: DeckId }
   | { name: 'vocab_practice_settings'; deckId: DeckId }
   | { name: 'manage' }
-  | { name: 'vocab' };
+  | { name: 'vocab' }
+  | { name: 'wk' };
 
 const safeRandomUUID = (): string => {
   try {
@@ -651,6 +653,10 @@ export default function App() {
     return <VocabBrowserScreen state={state} onBack={() => setScreen({ name: 'home' })} />;
   }
 
+  if (screen.name === 'wk') {
+    return <WkApp token={state.wkApiToken} onBack={() => setScreen({ name: 'home' })} onOpenManage={() => setScreen({ name: 'manage' })} />;
+  }
+
   const now = nowMs();
 
   return (
@@ -664,6 +670,7 @@ export default function App() {
           </div>
         </div>
         <div className="row">
+          <button className="primary" onClick={() => setScreen({ name: 'wk' })}>WK Path</button>
           <button onClick={() => setScreen({ name: 'vocab' })}>Vocab</button>
           <button onClick={() => setScreen({ name: 'manage' })}>Manage</button>
         </div>

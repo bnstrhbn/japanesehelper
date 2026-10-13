@@ -239,3 +239,95 @@ kbd {
   border-radius: 6px;
   font-size: 12px;
 }
+
+/* ---- WK Path ---- */
+:root {
+  --wk-radical: #00a1f1;
+  --wk-kanji: #f100a1;
+  --wk-vocab: #a100f1;
+}
+
+.wkBg-radical { background: var(--wk-radical); color: #fff; }
+.wkBg-kanji { background: var(--wk-kanji); color: #fff; }
+.wkBg-vocabulary { background: var(--wk-vocab); color: #fff; }
+
+.wkHeroRow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.wkHero { border: 0; color: #fff; padding: 20px; font-size: 18px; border-radius: 12px; text-align: left; }
+.wkHero-lessons { background: linear-gradient(135deg, var(--wk-kanji), #ff5fc8); }
+.wkHero-reviews { background: linear-gradient(135deg, var(--wk-radical), #4fc3ff); }
+.wkHeroCount { font-size: 40px; font-weight: 900; line-height: 1; }
+
+.wkBar { height: 10px; background: var(--border); border-radius: 999px; overflow: hidden; margin-top: 4px; }
+.wkBarFill { height: 100%; }
+
+.wkStageRow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 14px; }
+.wkStage { border-radius: 10px; padding: 10px; color: #fff; text-align: center; font-size: 12px; text-transform: capitalize; }
+.wkStageCount { font-size: 22px; font-weight: 900; }
+.wkStage-apprentice { background: #dd0093; }
+.wkStage-guru { background: #882d9e; }
+.wkStage-master { background: #294ddb; }
+.wkStage-enlightened { background: #0093dd; }
+.wkStage-burned { background: #434343; }
+
+.wkForecast { display: grid; gap: 4px; margin-top: 8px; }
+.wkForecastBar { display: inline-block; height: 8px; min-width: 4px; background: var(--wk-radical); border-radius: 4px; }
+
+.wkSubjectHeader { display: flex; gap: 16px; align-items: center; border-radius: 10px; padding: 16px; }
+.wkSubjectChars { font-size: 72px; line-height: 1; min-width: 72px; text-align: center; }
+.wkSubjectMeaning { font-size: 24px; font-weight: 900; }
+.wkRadicalImg { filter: invert(1); vertical-align: middle; }
+.wkChip .wkRadicalImg, .wkTile .wkRadicalImg, .wkLessonDot .wkRadicalImg { height: 1em; }
+
+.wkSection { margin-top: 16px; }
+.wkSectionTitle { font-weight: 900; border-bottom: 1px solid var(--border); padding-bottom: 4px; margin-bottom: 8px; }
+.wkMnemonic { margin: 6px 0; line-height: 1.6; }
+.wkHint { margin-top: 8px; padding: 10px; background: #f3f4f6; border-radius: 8px; font-size: 14px; }
+.wkNote { margin-top: 8px; padding: 10px; background: #fffbeb; border-radius: 8px; font-size: 14px; }
+.wkHl { padding: 0 3px; border-radius: 3px; color: #fff; }
+.wkHl-radical { background: var(--wk-radical); }
+.wkHl-kanji { background: var(--wk-kanji); }
+.wkHl-vocabulary { background: var(--wk-vocab); }
+.wkHl-meaning, .wkHl-reading { background: #555; }
+.wkHl-ja { background: transparent; color: inherit; font-weight: 700; }
+
+.wkReadingGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.wkReadingCol { opacity: 0.55; }
+.wkReadingCol-on { opacity: 1; }
+.wkReadingBtn { display: inline-flex; gap: 8px; align-items: center; }
+.wkSentence { margin-bottom: 10px; }
+
+.wkChips { display: flex; flex-wrap: wrap; gap: 8px; }
+.wkChip { display: inline-flex; gap: 8px; align-items: center; border: 0; padding: 6px 10px; border-radius: 8px; }
+.wkChipChars { font-size: 22px; font-weight: 700; }
+.wkChipText { display: flex; flex-direction: column; font-size: 12px; line-height: 1.2; text-align: left; }
+
+.wkTabs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.wkTabs button.active { background: var(--text); color: #fff; }
+
+.wkLessonStrip { display: flex; gap: 6px; flex-wrap: wrap; }
+.wkLessonDot { border: 0; font-size: 20px; padding: 6px 12px; opacity: 0.6; }
+.wkLessonDot.active { opacity: 1; outline: 3px solid var(--text); }
+
+.wkQuizChars { font-size: 96px; text-align: center; padding: 36px 12px; border-radius: 12px 12px 0 0; line-height: 1.1; }
+.wkQuizPrompt { text-align: center; padding: 8px; font-size: 16px; }
+.wkQuizPrompt.meaning { background: #e5e5e5; color: #111; }
+.wkQuizPrompt.reading { background: #333; color: #fff; }
+input.wkAnswer { text-align: center; font-size: 24px; border-radius: 0 0 12px 12px; border-top: 0; padding: 14px; }
+input.wkAnswer.good { background: #88cc00; color: #fff; }
+input.wkAnswer.close { background: #88cc00; color: #fff; }
+input.wkAnswer.bad { background: #ff0033; color: #fff; }
+input.wkAnswer.shake { animation: wkShake 0.35s; }
+@keyframes wkShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+.wkRetry { text-align: center; margin-top: 8px; color: var(--muted); }
+.wkAfter { text-align: center; margin-top: 12px; }
+
+.wkLevels { display: grid; grid-template-columns: repeat(auto-fill, minmax(42px, 1fr)); gap: 6px; margin-top: 10px; }
+.wkLevels button { padding: 6px 0; }
+.wkLevels button.reached { border-color: var(--wk-kanji); }
+.wkLevels button.active { background: var(--text); color: #fff; }
+.wkTiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin-top: 10px; }
+.wkTile { position: relative; border: 0; padding: 8px 6px 12px; overflow: hidden; }
+.wkTile.locked { opacity: 0.4; }
+.wkTileChars { font-size: 28px; font-weight: 700; line-height: 1.2; }
+.wkTileSub { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wkTileStage { position: absolute; left: 0; bottom: 0; height: 4px; background: rgba(255, 255, 255, 0.85); }
