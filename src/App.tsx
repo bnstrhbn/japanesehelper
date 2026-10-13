@@ -23,6 +23,7 @@ import { applySm2, defaultSrs } from './lib/srs';
 import { loadState, resetState, saveState } from './lib/storage';
 import { conjugateVerb as seedConjugateVerb, verbConjugationHintText, verbFormLabel as seedVerbFormLabel } from './lib/seed';
 import { WkApp } from './wk/WkApp';
+import { loadReachedVerbs } from './lib/wk/verbs';
 
 type Screen =
   | { name: 'home' }
@@ -230,36 +231,6 @@ export default function App() {
     let cancelled = false;
     setWkAutoSyncBusy(true);
 
-    const wkFetchAll = async (url: string): Promise<WkSubject[]> => {
-      const out: WkSubject[] = [];
-      let next: string | null = url;
-      let guard = 0;
-      while (next) {
-        guard += 1;
-        if (guard > 50) throw new Error('Too many pages while auto-syncing WaniKani verbs.');
-
-        const res = await fetch(next, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Wanikani-Revision': '20170710',
-          },
-        });
-        if (!res.ok) {
-          const msg = res.status === 401 ? 'Unauthorized (bad/expired token).' : `WaniKani error: ${res.status}`;
-          throw new Error(msg);
-        }
-
-        const body = (await res.json()) as {
-          data?: WkSubject[];
-          pages?: { next_url?: string | null };
-        };
-        const data = Array.isArray(body.data) ? body.data : [];
-        out.push(...data);
-        next = body.pages?.next_url ?? null;
-      }
-      return out;
-    };
-
     const wkPrimaryMeaning = (s: WkSubject): string => {
       const ms = s.data.meanings ?? [];
       return ms.find((m) => m.primary)?.meaning ?? ms[0]?.meaning ?? '';
@@ -294,17 +265,8 @@ export default function App() {
 
     (async () => {
       try {
-        const levels = [1, 2, 3, 4, 5, 6];
-        const params = new URLSearchParams({
-          types: 'vocabulary',
-          levels: levels.join(','),
-        });
-        const url = `https://api.wanikani.com/v2/subjects?${params.toString()}`;
-        const subjects = await wkFetchAll(url);
+        const { verbs: verbsOnly } = await loadReachedVerbs(token);
         if (cancelled) return;
-
-        const vocabs = subjects.filter((s) => s.object === 'vocabulary');
-        const verbsOnly = vocabs.filter((s) => (s.data.parts_of_speech ?? []).some((p) => /\bverb\b/.test(p.toLowerCase())));
 
         const syncedAt = nowMs();
         setState((prev) => {
@@ -2453,38 +2415,6 @@ function ManageScreen(props: {
     setWkTokenDraft(state.wkApiToken ?? '');
   }, [state.wkApiToken]);
 
-  const wkFetchAll = async (token: string, url: string): Promise<WkSubject[]> => {
-    const out: WkSubject[] = [];
-    let next: string | null = url;
-    let guard = 0;
-    while (next) {
-      guard += 1;
-      if (guard > 50) throw new Error('Too many pages while importing WaniKani subjects.');
-
-      const res = await fetch(next, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Wanikani-Revision': '20170710',
-        },
-      });
-
-      if (!res.ok) {
-        const msg = res.status === 401 ? 'Unauthorized (bad/expired token).' : `WaniKani error: ${res.status}`;
-        throw new Error(msg);
-      }
-
-      const body = (await res.json()) as {
-        data?: WkSubject[];
-        pages?: { next_url?: string | null };
-      };
-
-      const data = Array.isArray(body.data) ? body.data : [];
-      out.push(...data);
-      next = body.pages?.next_url ?? null;
-    }
-    return out;
-  };
-
   const wkPrimaryMeaning = (s: WkSubject): string => {
     const ms = s.data.meanings ?? [];
     return ms.find((m) => m.primary)?.meaning ?? ms[0]?.meaning ?? '';
@@ -2519,20 +2449,11 @@ function ManageScreen(props: {
     setWkImportMsg(null);
     setWkImportBusy(true);
     try {
-      const levels = [1, 2, 3, 4, 5, 6];
-      const params = new URLSearchParams({
-        types: 'vocabulary',
-        levels: levels.join(','),
-      });
-      const url = `https://api.wanikani.com/v2/subjects?${params.toString()}`;
-      const subjects = await wkFetchAll(token, url);
+      const { verbs: verbsOnly, level, source } = await loadReachedVerbs(token);
 
-      const vocabs = subjects.filter((s) => s.object === 'vocabulary');
-      const verbsOnly = vocabs.filter((s) => (s.data.parts_of_speech ?? []).some((p) => /\bverb\b/.test(p.toLowerCase())));
-
-      const wkVerbDeckName = 'WaniKani Verbs (L1–6)';
-      const wkVerbDeckDesc = 'Imported from WaniKani API (levels 1–6) — English → Japanese (kana)';
-      const existingWkVerbDeck = Object.values(state.decks).find((d) => d.name === wkVerbDeckName);
+      const wkVerbDeckName = 'WaniKani Verbs';
+      const wkVerbDeckDesc = `Verbs from WaniKani levels 1–${level} — English → Japanese (kana)`;
+      const existingWkVerbDeck = Object.values(state.decks).find((d) => d.name === wkVerbDeckName || d.name === 'WaniKani Verbs (L1–6)');
       const wkVerbDeckId = existingWkVerbDeck?.id ?? makeId('deck');
 
       const verbConjDeck = Object.values(state.decks).find((d) => d.name.toLowerCase().includes('verb conjugation'));
@@ -2559,15 +2480,11 @@ function ManageScreen(props: {
       let addedVocab = 0;
       let addedConj = 0;
 
-      if (!nextDecks[wkVerbDeckId]) {
-        nextDecks[wkVerbDeckId] = {
-          id: wkVerbDeckId,
-          name: wkVerbDeckName,
-          description: wkVerbDeckDesc,
-          direction: 'en-ja',
-          cardIds: [],
-        };
-      }
+      nextDecks[wkVerbDeckId] = {
+        ...(nextDecks[wkVerbDeckId] ?? { id: wkVerbDeckId, direction: 'en-ja' as const, cardIds: [] }),
+        name: wkVerbDeckName,
+        description: wkVerbDeckDesc,
+      };
 
       const ensureDeckCardList = (did: DeckId) => {
         if (!nextDecks[did]) return;
@@ -2700,7 +2617,7 @@ function ManageScreen(props: {
       });
 
       setWkImportMsg(
-        `Imported WK L1–6 verbs. Added ${addedVocab} vocab card(s) to “WaniKani Verbs (L1–6)”.` +
+        `Imported verbs from WaniKani levels 1–${level} (${source === 'local' ? 'downloaded WK Path content' : 'WaniKani API'}). Added ${addedVocab} vocab card(s) to “${wkVerbDeckName}”.` +
           (wkImportAlsoConjugate && verbConjDeckId ? ` Added ${addedConj} conjugation card(s) to Verb Conjugation.` : ''),
       );
     } catch (err) {
@@ -2880,7 +2797,8 @@ function ManageScreen(props: {
         <hr />
         <div style={{ fontWeight: 900 }}>Import</div>
         <div className="small" style={{ marginTop: 6 }}>
-          Import verbs from WaniKani levels 1–6 using your saved token. Data source: WaniKani API.
+          Import verbs from every WaniKani level you've reached (your WaniKani or WK Path level, whichever is higher). Uses
+          downloaded WK Path content when available, otherwise the WaniKani API with your saved token.
         </div>
         <div style={{ marginTop: 10 }} className="row">
           <label style={{ display: 'flex', gap: 8, alignItems: 'center', margin: 0 }}>
@@ -2895,7 +2813,7 @@ function ManageScreen(props: {
         </div>
         <div style={{ marginTop: 10 }} className="row">
           <button className="primary" onClick={() => void onImportWkVerbs()} disabled={!state.wkApiToken || wkImportBusy}>
-            {wkImportBusy ? 'Importing…' : 'Import WK verbs (L1–6)'}
+            {wkImportBusy ? 'Importing…' : 'Import WK verbs (all reached levels)'}
           </button>
         </div>
         {wkImportMsg ? (
